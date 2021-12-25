@@ -1,0 +1,9 @@
+sqlalchemy
+pydantic
+fastapi
+uvicorn
+psycopg2-binary
+jinja2
+loguru
+requests
+starlette
