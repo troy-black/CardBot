@@ -26,22 +26,26 @@ class CRUD(ABC):
             db.commit()
             db.refresh(model)
 
-        return model
+        logging.debug(f'Adding {cls.__name__}: {schema.dict()}')
 
-    @classmethod
-    def read_one(cls, db: Session, key: Key) -> Model:
-        return db.query(cls.model_class).filter(cls.model_column == key).first()
+        return model
 
     @classmethod
     def read_many(cls, db: Session, skip: int = 0, limit: int = 100) -> List[Model]:
         return db.query(cls.model_class).offset(skip).limit(limit).all()
 
     @classmethod
-    def upsert(cls, db: Session, schema: Schema) -> Model:
-        changes = {}
-        val = getattr(schema, cls.model_column.name)
-        model: cls.model_class = cls.read_one(db, key=val)
+    def read_one(cls, db: Session, key: Key) -> Model:
+        return db.query(cls.model_class).filter(cls.model_column == key).first()
 
+    @classmethod
+    def upsert(cls, db: Session, schema: Schema, *, commit: bool = True) -> Model:
+        model: cls.model_class = cls.read_one(
+            db=db,
+            key=getattr(schema, cls.model_column.name)
+        )
+
+        changes = {}
         if model:
             for key, val in schema.dict().items():
                 if hasattr(model, key) and getattr(model, key, 0) != val:
@@ -49,16 +53,13 @@ class CRUD(ABC):
                     changes[key] = val
 
             if changes:
+                if commit:
+                    db.commit()
+                    db.refresh(model)
+
                 logging.debug(f'Updating {cls.__name__}: {changes}')
 
         else:
-            model: cls.model_class = cls.model_class(**schema.dict())
-            db.add(model)
-            changes = True
-            logging.debug(f'Adding {cls.__name__}: {schema.dict()}')
-
-        if changes:
-            db.commit()
-            db.refresh(model)
+            model = cls.create(db, schema, commit=commit)
 
         return model

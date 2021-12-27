@@ -1,7 +1,5 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date, Computed
 from sqlalchemy.dialects.postgresql import JSON
-
-# from sqlalchemy.orm import relationship
 
 from tdb.cardbot.database import Base
 
@@ -10,16 +8,32 @@ class Card(Base):
     __tablename__ = 'cards'
 
     uuid = Column(String(36), primary_key=True, index=True)
+
     name = Column(String, nullable=False, index=True)
     asciiName = Column(String, index=True)
+    faceName = Column(String)
+
+    searchName = Column(String, Computed(
+        '''
+            CASE 
+                WHEN "faceName" IS NOT NULL THEN "faceName" 
+                WHEN "asciiName" IS NOT NULL THEN "asciiName" 
+                ELSE name 
+            END
+        '''
+    ))
+
     setCode = Column(String, ForeignKey('sets.code'), nullable=False, index=True)
     number = Column(String, nullable=False)
-    colorIdentity = Column(JSON)
 
+    colorIdentity = Column(JSON)
     colors = Column(JSON)
     manaCost = Column(String)
     rarity = Column(String)
     artist = Column(String)
+
+    imageUrl = Column(String)
+    imageLocal = Column(String)
 
     subtypes = Column(JSON)
     supertypes = Column(JSON)
@@ -35,10 +49,7 @@ class Card(Base):
     power = Column(String)
     toughness = Column(String)
 
-    # multiverseId = Column(String)
-    # scryfallId = Column(String)
-
-    identifiers = Column(JSON)
+    scryfallId = Column(String)
 
     availability = Column(JSON)
     hasAlternativeDeckLimit = Column(Boolean)

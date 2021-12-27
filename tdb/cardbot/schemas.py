@@ -31,6 +31,11 @@ class CardBase(BaseModel):
     rarity: Optional[str]
     artist: Optional[str]
 
+    imageUrl: Optional[str]
+    imageLocal: Optional[str]
+
+    faceName: Optional[str]
+
     # cardSet: Optional[SetBase]
 
 
@@ -49,10 +54,7 @@ class CardFull(CardBase):
     power: Optional[str]
     toughness: Optional[str]
 
-    # multiverseId: Optional[str]
-    # scryfallId: Optional[str]
-
-    identifiers: Optional[dict]
+    scryfallId: Optional[str]
 
     availability: Optional[List[str]]
     hasAlternativeDeckLimit: Optional[bool]
