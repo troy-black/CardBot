@@ -1,10 +1,16 @@
+import os
+from pathlib import Path
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date, Computed
 from sqlalchemy.dialects.postgresql import JSON
 
-from tdb.cardbot.database import Base
+from tdb.cardbot import config
+from tdb.cardbot.image import Image
+from tdb.cardbot.utils import download_file
+from tdb.cardbot.database import Database
 
 
-class Card(Base):
+class Card(Database.base):
     __tablename__ = 'cards'
 
     uuid = Column(String(36), primary_key=True, index=True)
@@ -53,7 +59,7 @@ class Card(Base):
 
     availability = Column(JSON)
     hasAlternativeDeckLimit = Column(Boolean)
-    edhrecRank = Column(Integer)
+    # edhrecRank = Column(Integer)
 
     borderColor = Column(String)
     finishes = Column(JSON)
@@ -76,8 +82,43 @@ class Card(Base):
 
     # cardSet = relationship('Set')
 
+    phash_32 = Column(String)
 
-class Set(Base):
+    cardkingdom_buylist_foil = Column(JSON)
+    cardkingdom_buylist_normal = Column(JSON)
+    cardkingdom_retail_foil = Column(JSON)
+    cardkingdom_retail_normal = Column(JSON)
+
+    # cardmarket_buylist_foil = Column(JSON)
+    # cardmarket_buylist_normal = Column(JSON)
+    cardmarket_retail_foil = Column(JSON)
+    cardmarket_retail_normal = Column(JSON)
+
+    tcgplayer_buylist_foil = Column(JSON)
+    tcgplayer_buylist_normal = Column(JSON)
+    tcgplayer_retail_foil = Column(JSON)
+    tcgplayer_retail_normal = Column(JSON)
+
+    def download_image(self):
+        """
+        Download image from Scryfall Api
+        """
+        if not self.imageUrl:
+            return
+
+        filename = str(Path(config.Config.image_path, self.imageLocal))
+
+        new_hash = False
+        if not os.path.exists(filename):
+            download_file(url=self.imageUrl, filename=filename)
+            new_hash = True
+
+        if new_hash or not self.phash_32:
+            phash = Image(Path(config.Config.image_path, self.setCode, f'{self.scryfallId}.png'))
+            self.phash_32 = str(phash.image_hash())
+
+
+class Set(Database.base):
     __tablename__ = 'sets'
 
     code = Column(String(8), primary_key=True, index=True)

@@ -12,3 +12,5 @@ class Set(CRUD):
 
     model_class: Callable = models.Set
     model_column: Column = models.Set.code
+
+    code: str

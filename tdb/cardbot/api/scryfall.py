@@ -1,74 +1,38 @@
 import logging
-import os
-from pathlib import Path
 
-from sqlalchemy.orm import Session
+from tdb.cardbot import utils
 
-from cardbot import utils
-from cardbot.crud.card import Card
-from tdb.cardbot import config
-from tdb.cardbot.utils import download_file
 
 BULK_DATA = 'https://api.scryfall.com/bulk-data'
 
 
 class Scryfall:
     @classmethod
-    def download_json(cls, url: str) -> dict:
-        return utils.download_file(url)
+    def download_data(cls) -> dict:
+        """
+        Download 'default_cards' from api.scryfall.com. Used to match scryfall images with mtgjson data
 
-    @classmethod
-    def process_bulk_data(cls, db: Session):
+        :return: dict containing Scryfall Api Image URL info keyed by scryfallId and cardName
+        """
+        logging.debug(f'Downloading Scryfall Bulk Data')
+
+        # Extract download_uri from bulk data for default_cards
         download_uri = next(
             data['download_uri']
-            for data in cls.download_json(BULK_DATA)['data']
+            for data in utils.download_file(BULK_DATA)['data']
             if data['type'] == 'default_cards'
         )
 
-        updates = 0
-        for data in cls.download_json(download_uri):
-            scryfall_id = data['id']
+        default_cards = utils.download_file(download_uri)
 
-            if data.get('card_faces'):
-                if data.get('card_faces')[0].get('image_uris'):
-                    card_faces = {
-                        card_face['name']: card_face.get('image_uris', {}).get('png')
-                        for card_face in data.get('card_faces')
-                    }
-                else:
-                    card_faces = {
-                        card_face['name']: data.get('image_uris', {}).get('png')
-                        for card_face in data.get('card_faces')
-                    }
-            else:
-                card_faces = {
-                    card_face['name']: card_face.get('image_uris', {}).get('png')
-                    for card_face in [data]
-                }
-
-            for card_name, png_url in card_faces.items():
-                if card_name and png_url:
-                    card = Card.read_one_by_scryfall_and_name(db, scryfall_id, card_name)
-                    if card:
-                        filename = str(Path(config.Config.image_path, card.setCode, f'{card.scryfallId}.png'))
-
-                        if card.imageUrl != png_url:
-                            if card.imageUrl:
-                                os.remove(card.imageLocal)
-
-                            if not os.path.exists(filename):
-                                download_file(
-                                    url=png_url,
-                                    filename=filename
-                                )
-
-                            card.imageUrl = png_url
-                            card.imageLocal = filename
-                            updates += 1
-
-            logging.debug(f'Syncing Image [{updates}]: {card_name}')
-
-            if updates % 100 == 0:
-                db.commit()
-
-        db.commit()
+        # Build dict of IMAGE_URL keyed by (SCRYFALL_ID, CARD_NAME)
+        #                Check for individual uri inside card_faces
+        # example: {
+        #     (SCRYFALL_ID, CARD_NAME): IMAGE_URL,
+        # }
+        return {
+            (data['id'], card_face['name']):
+                (card_face if card_face.get('image_uris') else data).get('image_uris', {}).get('png')
+            for data in default_cards
+            for card_face in (data.get('card_faces') or [data])
+        }

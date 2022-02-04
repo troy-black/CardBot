@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, List
 
 from sqlalchemy import Column
 from sqlalchemy.orm import Session
@@ -14,9 +14,34 @@ class Card(CRUD):
     model_class: Callable = models.Card
     model_column: Column = models.Card.uuid
 
+    uuid: str
+    phash_32: str
+    setCode: str
+    scryfallId: str
+    imageUrl: str
+    imageLocal: str
+
     @classmethod
-    def read_one_by_scryfall_and_name(cls, db: Session, scryfall_id: str, card_name: str) -> models.Card:
+    def read_all_hashes(cls, db: Session) -> List[models.Card]:
+        """
+        Pull all records with a phash
+
+        :param db: SqlAlchemy DB Session
+        :return: List[Card]
+        """
         return db.query(models.Card).filter(
-            models.Card.scryfallId == scryfall_id
-            and models.Card.searchName == card_name
-        ).first()
+            models.Card.phash_32 is not None
+        ).all()
+
+    # @classmethod
+    # def read_all_cards_by_set(cls, db: Session, set_code: str) -> List[models.Card]:
+    #     """
+    #     Pull all records with a phash
+    #
+    #     :param db: SqlAlchemy DB Session
+    #     :param set_code: MTG Set to filter by
+    #     :return: List[Card]
+    #     """
+    #     return db.query(models.Card).filter(
+    #         models.Card.setCode == set_code
+    #     ).all()

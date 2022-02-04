@@ -1,25 +1,33 @@
 from datetime import date
+from enum import Enum
 from typing import Optional, List
+from uuid import uuid4, UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-class SetBase(BaseModel):
+class BaseSchema(BaseModel):
+    def print(self):
+        return self.cls.__name__
+
+
+class SetFull(BaseSchema):
     code: str
     name: str
     keyruneCode: Optional[str]
     releaseDate: Optional[date]
 
-
-class SetFull(SetBase):
     parentCode: Optional[str]
     totalSetSize: Optional[int]
 
     class Config:
         orm_mode = True
 
+    def print(self):
+        return f'[{self.code}] {self.name}'
 
-class CardBase(BaseModel):
+
+class NewCard(BaseSchema):
     uuid: str
     name: str
     asciiName: Optional[str]
@@ -36,10 +44,6 @@ class CardBase(BaseModel):
 
     faceName: Optional[str]
 
-    # cardSet: Optional[SetBase]
-
-
-class CardFull(CardBase):
     subtypes: Optional[List[str]]
     supertypes: Optional[List[str]]
     text: Optional[str]
@@ -58,7 +62,7 @@ class CardFull(CardBase):
 
     availability: Optional[List[str]]
     hasAlternativeDeckLimit: Optional[bool]
-    edhrecRank: Optional[int]
+    # edhrecRank: Optional[int]
 
     borderColor: Optional[str]
     finishes: Optional[List[str]]
@@ -79,7 +83,45 @@ class CardFull(CardBase):
     isReprint: Optional[bool]
     isReserved: Optional[bool]
 
+    cardkingdom_buylist_foil: Optional[dict]
+    cardkingdom_buylist_normal: Optional[dict]
+    cardkingdom_retail_foil: Optional[dict]
+    cardkingdom_retail_normal: Optional[dict]
+
+    # cardmarket_buylist_foil: Optional[dict]
+    # cardmarket_buylist_normal: Optional[dict]
+    cardmarket_retail_foil: Optional[dict]
+    cardmarket_retail_normal: Optional[dict]
+
+    tcgplayer_buylist_foil: Optional[dict]
+    tcgplayer_buylist_normal: Optional[dict]
+    tcgplayer_retail_foil: Optional[dict]
+    tcgplayer_retail_normal: Optional[dict]
+
     # cardSet: Optional[SetFull]
 
     class Config:
         orm_mode = True
+
+    def print(self):
+        return f'[{self.setCode}] {self.faceName or self.asciiName or self.name} [{self.number}]'
+
+
+class CardMarket(Enum):
+    # TODO - ENUMS
+    pass
+
+
+class CardFull(NewCard):
+    searchName: Optional[str]
+    phash_32: Optional[str]
+
+    def price_schema(self):
+        data = {}
+        return self.__class__(**data)
+
+
+class JobDetails(BaseModel):
+    job_id: UUID = Field(default_factory=uuid4)
+    status: Optional[str] = 'running'
+    results: Optional[dict] = None
