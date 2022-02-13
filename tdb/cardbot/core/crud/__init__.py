@@ -5,8 +5,8 @@ from typing import List, TypeVar, Callable
 from sqlalchemy import Column
 from sqlalchemy.orm import Session
 
-from tdb.cardbot.database import Database
-from tdb.cardbot.schemas import BaseSchema
+from tdb.cardbot.core.database import Database
+from tdb.cardbot.core.schemas import BaseSchema
 
 
 class CRUD(ABC):

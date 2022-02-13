@@ -2,8 +2,8 @@ from typing import TypeVar, Callable
 
 from sqlalchemy import Column
 
-from tdb.cardbot import models, schemas
-from tdb.cardbot.crud import CRUD
+from tdb.cardbot.core import schemas, models
+from tdb.cardbot.core.crud import CRUD
 
 
 class Set(CRUD):

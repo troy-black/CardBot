@@ -5,7 +5,7 @@ from typing import List
 import imagehash
 from sqlalchemy.orm import Session
 
-from tdb.cardbot.crud.card import Card
+from tdb.cardbot.core.crud.card import Card
 
 
 class HashRow:

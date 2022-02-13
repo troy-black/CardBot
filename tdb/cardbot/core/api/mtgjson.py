@@ -1,7 +1,7 @@
 import logging
 from enum import Enum
 
-from tdb.cardbot import utils
+from tdb.cardbot.core import utils
 
 MTGJSON_API_URL = 'https://mtgjson.com/api/v5/'
 

@@ -6,7 +6,7 @@ import numpy
 import scipy.fftpack
 from PIL import ImageFile, Image as PillowImage
 
-from tdb.cardbot import config
+from tdb.cardbot.core import config
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 

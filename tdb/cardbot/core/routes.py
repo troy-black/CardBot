@@ -1,21 +1,18 @@
 import datetime
 from http import HTTPStatus
-from pathlib import Path
-from typing import List, Union
+from typing import Union
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
-from starlette.templating import Jinja2Templates
 
-from tdb.cardbot.api import Api
-from tdb.cardbot.crud.job import Job
-from tdb.cardbot.crud.log import Log
-from tdb.cardbot.database import Database
-from tdb.cardbot.schemas import LogDetails, JobDetails
+from tdb.cardbot.core.api import Api
+from tdb.cardbot.core.crud.job import Job
+from tdb.cardbot.core.database import Database
+from tdb.cardbot.core.schemas import JobDetails
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(str(Path(__file__).parent), 'templates')))
+# templates = Jinja2Templates(directory=str(Path(str(Path(__file__).parent), 'templates')))
 
 
 @router.get('/database/update', status_code=HTTPStatus.ACCEPTED, response_model=JobDetails)
@@ -26,17 +23,6 @@ async def database_update() -> JobDetails:
     :return: JobDetails
     """
     return await Api.run()
-
-
-@router.get('/logs', response_model=List[LogDetails])
-async def get_logs(db: Session = Depends(Database.get_db)) -> List[LogDetails]:
-    """
-    Stream the most recent Application Logs
-
-    :param db: SqlAlchemy DB Session
-    :return: List[LogDetails]
-    """
-    return Log.read_logs(db)
 
 
 @router.get('/jobs/{key}', response_model=JobDetails)

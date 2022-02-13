@@ -3,8 +3,8 @@ from typing import TypeVar, Callable, Union
 from sqlalchemy import Column
 from sqlalchemy.orm import Session
 
-from tdb.cardbot import models, schemas
-from tdb.cardbot.crud import CRUD
+from tdb.cardbot.core import schemas, models
+from tdb.cardbot.core.crud import CRUD
 
 
 class Job(CRUD):

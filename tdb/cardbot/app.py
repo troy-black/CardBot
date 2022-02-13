@@ -1,17 +1,31 @@
 import logging
+from abc import ABC
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 
-from tdb.cardbot import routes
-from tdb.cardbot.database import Database
 
-logging.debug('Starting Application')
+class BaseApp(ABC):
+    _app: FastAPI = None
+    router: APIRouter
 
-# Bind DB Model Object to each DB Table
-Database.base.metadata.create_all(bind=Database.engine())
+    @classmethod
+    def app(cls):
+        # Lazy Load FastApi Service
+        if not cls._app:
+            cls._app = FastAPI()
+        return cls._app
 
-# Load FastApi Service
-app = FastAPI()
+    @classmethod
+    def setup(cls):
+        logging.debug('Starting Application')
 
-# Load API routes
-app.include_router(routes.router)
+        # Call any specific application setup
+        cls._setup()
+
+        # Load specific api routes for application
+        cls.app().include_router(cls.router)
+
+    @classmethod
+    def _setup(cls):
+        # Optional setup steps
+        pass

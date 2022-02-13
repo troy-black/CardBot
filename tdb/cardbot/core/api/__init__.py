@@ -1,20 +1,19 @@
 import datetime
 import logging
-import time
 from pathlib import Path
 from typing import List
 
 from sqlalchemy.orm import Session
 
-from cardbot.crud.job import Job
-from tdb.cardbot import config
-from tdb.cardbot.api.mtgjson import MTGJson, Filenames
-from tdb.cardbot.api.scryfall import Scryfall
-from tdb.cardbot.crud.card import Card
-from tdb.cardbot.crud.set import Set
-from tdb.cardbot.database import Database
-from tdb.cardbot.futures import Thread, ThreadPool, JobPool
-from tdb.cardbot.schemas import SetFull, JobDetails, NewCard
+from tdb.cardbot.core import config
+from tdb.cardbot.core.api.mtgjson import MTGJson, Filenames
+from tdb.cardbot.core.api.scryfall import Scryfall
+from tdb.cardbot.core.crud.card import Card
+from tdb.cardbot.core.crud.job import Job
+from tdb.cardbot.core.crud.set import Set
+from tdb.cardbot.core.database import Database
+from tdb.cardbot.core.futures import Thread, ThreadPool, JobPool
+from tdb.cardbot.core.schemas import SetFull, JobDetails, NewCard
 
 
 class Api(JobPool):

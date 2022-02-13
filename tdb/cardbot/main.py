@@ -1,38 +1,44 @@
+from abc import ABC
+
 from uvicorn import Config as UvicornConfig
 from uvicorn import Server
+from uvicorn.importer import import_from_string
 
-from tdb.cardbot import config
-from tdb.cardbot import logger
-from tdb.cardbot.crud.job import Job
-from tdb.cardbot.crud.log import Log
-from tdb.cardbot.database import Database
+from tdb.cardbot.app import BaseApp
+from tdb.cardbot import logger, config
 
 
-def main():
-    """
-    Application entry point
-    """
-    # TODO - pass cmd args here...
-    config.Config.load()
+class BaseMain(ABC):
+    # app: BaseApp
+    config: config.BaseConfig
 
-    uvicorn_config = UvicornConfig(
-        'tdb.cardbot.app:app',
-        host='0.0.0.0',
-        log_level=config.Config.log_level.lower(),
-        workers=4
-    )
+    @classmethod
+    def launch(cls):
+        # TODO - pass cmd args here...
+        cls.config.load()
 
-    server = Server(uvicorn_config)
+        app = import_from_string(cls.config.app)
 
-    # override logging settings to all use loguru
-    logger.setup_logging(config.Config.log_level, config.Config.serialize_logging)
+        app.setup()
 
-    with Database.db_contextmanager() as db:
-        Log.truncate(db)
-        Job.truncate(db)
+        uvicorn_config = UvicornConfig(
+            app.app(),
+            # cls.config.app,
+            host='0.0.0.0',
+            log_level=cls.config.log_level.lower(),
+            workers=4
+        )
 
-    server.run()
+        server = Server(uvicorn_config)
 
+        # override logging settings to all use loguru
+        logger.setup_logging(cls.config.log_level, cls.config.serialize_logging)
 
-if __name__ == '__main__':
-    main()
+        cls._setup()
+
+        server.run()
+
+    @classmethod
+    def _setup(cls):
+        # Optional setup steps
+        pass

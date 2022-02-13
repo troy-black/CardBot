@@ -1,12 +1,7 @@
-import datetime
 import logging
 import sys
 
 from loguru import logger
-
-from tdb.cardbot.crud.log import Log
-from tdb.cardbot.database import Database
-from tdb.cardbot.schemas import LogDetails
 
 
 class InterceptHandler(logging.Handler):
@@ -29,16 +24,6 @@ class InterceptHandler(logging.Handler):
             depth += 1
 
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
-        if logging.getLogger(record.name).level <= record.levelno and '/logs' not in record.args:
-            with Database.db_contextmanager() as db:
-                Log.create(db, LogDetails(
-                    time=datetime.datetime.fromtimestamp(record.created),
-                    level=record.levelname,
-                    thread_name=record.threadName,
-                    location=f'{record.pathname}:{record.funcName}:{record.lineno}',
-                    message=record.msg % record.args if record.args else record.msg
-                ))
 
 
 def setup_logging(level: str, serialize: bool):

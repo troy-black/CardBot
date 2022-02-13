@@ -1,14 +1,11 @@
 import json
 import os
-from pathlib import Path
+from abc import ABC
 
 
-class Config:
-    hash_pixels_height: int = 1000
-    image_path: str = '/images/'
+class BaseConfig(ABC):
+    app: str
     log_level: str = 'DEBUG'
-    max_threads: int = 1
-
     serialize_logging: bool = False
 
     @classmethod
@@ -39,18 +36,12 @@ class Config:
                     result.update(details)
                     details = result
 
-        # Load base image_path
-        if details.get('image_path'):
-            cls.image_path = details.get('image_path')
-        else:
-            # Set default to 2 parents from the app ('../../images/')
-            from tdb.cardbot import app
-            parent_path = Path(os.path.abspath(app.__file__)).parents[2]
-            cls.image_path = f'{parent_path}/images/'
-        os.makedirs(cls.image_path, exist_ok=True)
-
-        # Load remaining Config details
-        cls.hash_pixels_height = details.get('hash_pixels_height', cls.hash_pixels_height)
         cls.log_level = details.get('log_level', cls.log_level)
-        cls.max_threads = details.get('max_threads', os.cpu_count() or cls.max_threads)
         cls.serialize_logging = details.get('serialize_logging', cls.serialize_logging)
+
+        cls._load(details)
+
+    @classmethod
+    def _load(cls, details: dict):
+        # Optional setup steps
+        pass

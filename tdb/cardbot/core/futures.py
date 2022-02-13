@@ -3,10 +3,10 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Callable, List
 
-from tdb.cardbot.crud.job import Job
-from tdb.cardbot.database import Database
-from tdb.cardbot import models
-from tdb.cardbot.schemas import JobDetails
+from tdb.cardbot.core import models
+from tdb.cardbot.core.crud.job import Job
+from tdb.cardbot.core.database import Database
+from tdb.cardbot.core.schemas import JobDetails
 
 
 class JobPool(ABC):

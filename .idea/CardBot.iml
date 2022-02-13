@@ -12,8 +12,6 @@
       <sourceFolder url="file://$MODULE_DIR$/tdb" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/.idea" />
-      <excludeFolder url="file://$MODULE_DIR$/log" />
-      <excludeFolder url="file://$MODULE_DIR$/pico" />
       <excludeFolder url="file://$MODULE_DIR$/images" />
     </content>
     <orderEntry type="inheritedJdk" />

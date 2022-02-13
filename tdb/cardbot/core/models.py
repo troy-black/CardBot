@@ -4,10 +4,10 @@ from pathlib import Path
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date, Computed, DateTime
 from sqlalchemy.dialects.postgresql import JSON
 
-from tdb.cardbot import config
-from tdb.cardbot.database import Database
-from tdb.cardbot.image import Image
-from tdb.cardbot.utils import download_file
+from tdb.cardbot.core import config
+from tdb.cardbot.core.database import Database
+from tdb.cardbot.core.image import Image
+from tdb.cardbot.core.utils import download_file
 
 
 class Card(Database.base):
