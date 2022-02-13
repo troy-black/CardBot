@@ -1,3 +1,4 @@
+import datetime
 import logging
 import time
 from pathlib import Path
@@ -5,17 +6,18 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
+from cardbot.crud.job import Job
 from tdb.cardbot import config
 from tdb.cardbot.api.mtgjson import MTGJson, Filenames
 from tdb.cardbot.api.scryfall import Scryfall
 from tdb.cardbot.crud.card import Card
 from tdb.cardbot.crud.set import Set
 from tdb.cardbot.database import Database
-from tdb.cardbot.futures import Thread, ThreadPool
+from tdb.cardbot.futures import Thread, ThreadPool, JobPool
 from tdb.cardbot.schemas import SetFull, JobDetails, NewCard
 
 
-class Api:
+class Api(JobPool):
     @classmethod
     def _process_card(cls, db: Session, card_data: dict, scryfall_data: dict, pricing: dict):
         """
@@ -90,7 +92,7 @@ class Api:
         return count
 
     @classmethod
-    def _update_database_thread(cls, mtgjson_data: list[dict], scryfall_data: dict, prices: dict) -> dict:
+    def _update_database_thread(cls, mtgjson_data: list[dict], scryfall_data: dict, prices: dict, job_id: str) -> dict:
         """
         Separate thread to process shared mtgjson_data
 
@@ -102,9 +104,8 @@ class Api:
         results = {}
 
         # use a separate db connection for each thread
-        with Database.get_db() as db:
-            # each thread loops over mtgjson_data popping an element to process
-            while mtgjson_data:
+        with Database.db_contextmanager() as db:
+            while mtgjson_data and Job.read_one(db, job_id).status == 'running':
                 set_data = mtgjson_data.pop()
 
                 results[set_data['code']] = cls._process_set(db, set_data, scryfall_data, prices)
@@ -114,14 +115,15 @@ class Api:
         return results
 
     @classmethod
-    async def update_data(cls, details: JobDetails):
+    def _run(cls, details: JobDetails):
         """
         Download and process data from external API sources (MTGJson, Scryfall)
 
         :param details: Job details
         """
         logging.debug(f'Starting Api update_data: {details.job_id}')
-        start_timestamp = time.time()
+
+        cls.last_job_id = details.job_id
 
         # Download data from Scryfall and MTGJson APIs (threaded)
         threads: List[Thread] = [
@@ -138,19 +140,30 @@ class Api:
 
         # Start a new ThreadPool to process the download data from external api
         threads: List[Thread] = [
-            Thread(cls._update_database_thread, mtgjson_data=mtgjson_data, scryfall_data=scryfall_data, prices=prices)
+            Thread(
+                cls._update_database_thread,
+                mtgjson_data=mtgjson_data,
+                scryfall_data=scryfall_data,
+                prices=prices,
+                job_id=details.job_id
+            )
             for _ in range(config.Config.max_threads)
         ]
         results = ThreadPool.run(threads, thread_prefix='GetCard')
 
-        logging.debug(f'Completed Api update_data: {details.job_id}')
-        end_timestamp = time.time()
+        with Database.db_contextmanager() as db:
+            # Refresh details
+            details = Job.read_one(db, details.job_id)
 
-        results = {
-            'start_timestamp': start_timestamp,
-            'end_timestamp': end_timestamp,
-            'results': results
-        }
+            details.results = results
 
-        details.results = results
-        details.status = "complete"
+            if details.status == 'running':
+                details.status = 'complete'
+
+            details.end_time = datetime.datetime.now()
+
+            db.commit()
+
+            logging.debug(f'Completed Api update_data: {details.job_id}')
+
+        cls._lock.release()

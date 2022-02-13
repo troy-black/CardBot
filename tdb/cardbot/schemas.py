@@ -1,14 +1,14 @@
+import datetime
 from datetime import date
 from enum import Enum
 from typing import Optional, List
-from uuid import uuid4, UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class BaseSchema(BaseModel):
     def print(self):
-        return self.cls.__name__
+        return self.__class__.__name__
 
 
 class SetFull(BaseSchema):
@@ -88,8 +88,6 @@ class NewCard(BaseSchema):
     cardkingdom_retail_foil: Optional[dict]
     cardkingdom_retail_normal: Optional[dict]
 
-    # cardmarket_buylist_foil: Optional[dict]
-    # cardmarket_buylist_normal: Optional[dict]
     cardmarket_retail_foil: Optional[dict]
     cardmarket_retail_normal: Optional[dict]
 
@@ -121,7 +119,24 @@ class CardFull(NewCard):
         return self.__class__(**data)
 
 
-class JobDetails(BaseModel):
-    job_id: UUID = Field(default_factory=uuid4)
-    status: Optional[str] = 'running'
-    results: Optional[dict] = None
+class JobDetails(BaseSchema):
+    job_id: Optional[int]
+    job_type: str
+    start_time: datetime.datetime = datetime.datetime.now()
+    end_time: Optional[datetime.datetime]
+    status: str = 'running'
+    results: Optional[dict]
+
+    class Config:
+        orm_mode = True
+
+
+class LogDetails(BaseSchema):
+    time: datetime.datetime
+    level: str
+    thread_name: str
+    location: str
+    message: str
+
+    class Config:
+        orm_mode = True

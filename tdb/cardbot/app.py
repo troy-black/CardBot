@@ -1,5 +1,4 @@
 import logging
-from concurrent.futures.process import ProcessPoolExecutor
 
 from fastapi import FastAPI
 
@@ -16,19 +15,3 @@ app = FastAPI()
 
 # Load API routes
 app.include_router(routes.router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Setup background ProcessPoolExecutor
-    """
-    app.state.executor = ProcessPoolExecutor()
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    """
-    Shutdown background ProcessPoolExecutor
-    """
-    app.state.executor.shutdown()

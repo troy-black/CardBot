@@ -32,16 +32,3 @@ class Card(CRUD):
         return db.query(models.Card).filter(
             models.Card.phash_32 is not None
         ).all()
-
-    # @classmethod
-    # def read_all_cards_by_set(cls, db: Session, set_code: str) -> List[models.Card]:
-    #     """
-    #     Pull all records with a phash
-    #
-    #     :param db: SqlAlchemy DB Session
-    #     :param set_code: MTG Set to filter by
-    #     :return: List[Card]
-    #     """
-    #     return db.query(models.Card).filter(
-    #         models.Card.setCode == set_code
-    #     ).all()

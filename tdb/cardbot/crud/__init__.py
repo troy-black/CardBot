@@ -34,7 +34,8 @@ class CRUD(ABC):
             db.commit()
             db.refresh(model)
 
-        logging.debug(f'Adding {cls.__name__}: {schema.dict()}')
+        if cls.__name__ != 'Log':
+            logging.debug(f'Adding {cls.__name__}: {schema.dict()}')
 
         return model
 
@@ -62,6 +63,18 @@ class CRUD(ABC):
         return db.query(cls.model_class).filter(cls.model_column == key).first()
 
     @classmethod
+    def truncate(cls, db: Session):
+        """
+        Delete all records from Table
+
+        :param db: SqlAlchemy DB Session
+        """
+
+        db.execute(f'TRUNCATE TABLE {cls.model_class.__tablename__} restart identity')
+
+        db.commit()
+
+    @classmethod
     def upsert(cls, db: Session, schema: Schema, *, commit: bool = True) -> Model:
         """
         Update existing record, or Insert a new record; based on the Pydantic Schema
@@ -84,6 +97,10 @@ class CRUD(ABC):
             # Update record and store changes
             for key, val in schema.dict().items():
                 old = getattr(model, key)
+                if isinstance(old, dict):
+                    # Merge dictionaries and sort
+                    val = dict(sorted({**old, **(val or {})}.items()))
+
                 if old != val:
                     setattr(model, key, val)
                     changes[key] = {
@@ -97,7 +114,8 @@ class CRUD(ABC):
                     db.commit()
                     db.refresh(model)
 
-                logging.debug(f'Updating {schema.print()}: {changes}')
+                if cls.__name__ != 'Log':
+                    logging.debug(f'Updating {schema.print()}: {changes}')
 
         else:
             # Create new record

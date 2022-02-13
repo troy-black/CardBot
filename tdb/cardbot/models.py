@@ -1,13 +1,13 @@
 import os
 from pathlib import Path
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date, Computed
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date, Computed, DateTime
 from sqlalchemy.dialects.postgresql import JSON
 
 from tdb.cardbot import config
+from tdb.cardbot.database import Database
 from tdb.cardbot.image import Image
 from tdb.cardbot.utils import download_file
-from tdb.cardbot.database import Database
 
 
 class Card(Database.base):
@@ -89,8 +89,6 @@ class Card(Database.base):
     cardkingdom_retail_foil = Column(JSON)
     cardkingdom_retail_normal = Column(JSON)
 
-    # cardmarket_buylist_foil = Column(JSON)
-    # cardmarket_buylist_normal = Column(JSON)
     cardmarket_retail_foil = Column(JSON)
     cardmarket_retail_normal = Column(JSON)
 
@@ -127,3 +125,25 @@ class Set(Database.base):
     parentCode = Column(String)
     releaseDate = Column(Date)
     totalSetSize = Column(Integer)
+
+
+class Job(Database.base):
+    __tablename__ = 'jobs'
+
+    job_id = Column(Integer, primary_key=True)
+    job_type = Column(String, index=True)
+    start_time = Column(DateTime, index=True)
+    end_time = Column(DateTime)
+    status = Column(String)
+    results = Column(JSON)
+
+
+class Log(Database.base):
+    __tablename__ = 'logs'
+
+    log_id = Column(Integer, primary_key=True)
+    time = Column(DateTime, index=True)
+    level = Column(String)
+    thread_name = Column(String)
+    location = Column(String)
+    message = Column(String)

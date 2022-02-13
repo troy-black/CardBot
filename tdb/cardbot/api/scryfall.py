@@ -2,7 +2,6 @@ import logging
 
 from tdb.cardbot import utils
 
-
 BULK_DATA = 'https://api.scryfall.com/bulk-data'
 
 

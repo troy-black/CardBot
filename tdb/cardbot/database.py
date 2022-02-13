@@ -43,8 +43,16 @@ class Database:
         return cls._local_session
 
     @classmethod
+    def get_db(cls):
+        db = cls.local_session()()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    @classmethod
     @contextmanager
-    def get_db(cls) -> Session:
+    def db_contextmanager(cls) -> Session:
         """
         DB Context Manager
         """

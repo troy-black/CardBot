@@ -1,49 +1,45 @@
 import concurrent.futures
-from typing import Dict, Callable, List
-from uuid import UUID
+import threading
+from abc import ABC, abstractmethod
+from typing import Callable, List
 
-from starlette.background import BackgroundTasks
-
+from tdb.cardbot.crud.job import Job
+from tdb.cardbot.database import Database
+from tdb.cardbot import models
 from tdb.cardbot.schemas import JobDetails
 
 
-class JobPool:
-    jobs: Dict[UUID, JobDetails] = {}
-    max_cache: int = 5
+class JobPool(ABC):
+    _lock = threading.Lock()
+
+    last_job_id: int = 0
 
     @classmethod
-    async def _run_job(cls, details: JobDetails, function: Callable, **kwargs) -> JobDetails:
-        """
-        Async function that calls the background Job function
-
-        :param details: JobDetails containing status and results
-        :param function: Function to run in the background
-        :param kwargs: Dict passed to the function as kwargs
-        :return: JobDetails
-        """
-        await function(details, **kwargs)  # , **kwargs
-
-        return details
+    @abstractmethod
+    def _run(cls, **kwargs):
+        pass
 
     @classmethod
-    def run(cls, background_tasks: BackgroundTasks, function: Callable, **kwargs) -> JobDetails:
+    async def run(cls, **kwargs) -> models.Job:
         """
         Run Job in background process
 
-        :param background_tasks: Starlette BackgroundTasks
-        :param function: Function to run in the background
         :param kwargs: Dict passed to the function as kwargs
         :return: JobDetails
         """
-        details = JobDetails()
+        with Database.db_contextmanager() as db:
+            if cls._lock.acquire(False):
+                details = JobDetails(job_type=cls.__name__)
+                record = Job.create(db, details)
 
-        cls.jobs[details.job_id] = details
+                details = JobDetails(**record.__dict__)
 
-        # Clean old jobs from the cache
-        while len(cls.jobs) > cls.max_cache:
-            cls.jobs.pop(next(iter(cls.jobs)))
-
-        background_tasks.add_task(cls._run_job, details, function, **kwargs)
+                # TODO - Should this be multiprocessing instead of threading
+                #        Must run in background and continue
+                thread = threading.Thread(target=cls._run, args=(details,), kwargs=kwargs)
+                thread.start()
+            else:
+                details = Job.read_one(db, cls.last_job_id)
 
         return details
 

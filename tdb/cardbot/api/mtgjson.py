@@ -1,6 +1,5 @@
 import logging
 from enum import Enum
-from typing import List
 
 from tdb.cardbot import utils
 
