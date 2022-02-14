@@ -129,14 +129,3 @@ class JobDetails(BaseSchema):
 
     class Config:
         orm_mode = True
-
-
-class LogDetails(BaseSchema):
-    time: datetime.datetime
-    level: str
-    thread_name: str
-    location: str
-    message: str
-
-    class Config:
-        orm_mode = True

@@ -136,14 +136,3 @@ class Job(Database.base):
     end_time = Column(DateTime)
     status = Column(String)
     results = Column(JSON)
-
-
-class Log(Database.base):
-    __tablename__ = 'logs'
-
-    log_id = Column(Integer, primary_key=True)
-    time = Column(DateTime, index=True)
-    level = Column(String)
-    thread_name = Column(String)
-    location = Column(String)
-    message = Column(String)
