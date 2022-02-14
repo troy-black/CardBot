@@ -2,28 +2,45 @@ import logging
 from abc import ABC
 
 from fastapi import FastAPI, APIRouter
+from uvicorn import Config as UvicornConfig
+from uvicorn import Server
+
+from tdb.cardbot import config
+from tdb.cardbot import logger
 
 
 class BaseApp(ABC):
-    _app: FastAPI = None
+    app: FastAPI = FastAPI()
+
     router: APIRouter
+    config: config.BaseConfig
 
     @classmethod
-    def app(cls):
-        # Lazy Load FastApi Service
-        if not cls._app:
-            cls._app = FastAPI()
-        return cls._app
+    def launch(cls):
+        # TODO - pass cmd args here...
+        cls.config.load()
 
-    @classmethod
-    def setup(cls):
-        logging.debug('Starting Application')
+        logging.debug(f'Starting Application')
+
+        # Load specific api routes for application
+        cls.app.include_router(cls.router)
+
+        uvicorn_config = UvicornConfig(
+            cls.app,
+            host='0.0.0.0',
+            log_level=cls.config.log_level.lower(),
+            workers=4
+        )
+
+        server = Server(uvicorn_config)
+
+        # override logging settings to all use loguru
+        logger.setup_logging(cls.config.log_level, cls.config.serialize_logging)
 
         # Call any specific application setup
         cls._setup()
 
-        # Load specific api routes for application
-        cls.app().include_router(cls.router)
+        server.run()
 
     @classmethod
     def _setup(cls):

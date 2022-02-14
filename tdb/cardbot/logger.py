@@ -43,6 +43,7 @@ def setup_logging(level: str, serialize: bool):
         logging.getLogger(name).handlers = []
         logging.getLogger(name).propagate = True
 
+    # TODO - Does this need removed from 'node'
     # Change specific loggers to lower log noise
     logging.getLogger('PIL.PngImagePlugin').setLevel(logging.WARNING)
 
