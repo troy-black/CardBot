@@ -1,11 +1,9 @@
-from abc import ABC
-
 from fastapi import APIRouter
 from starlette.responses import RedirectResponse
 from starlette.templating import Jinja2Templates
 
 
-class BaseRoutes(ABC):
+class BaseRoutes:
     router = APIRouter()
 
     templates: Jinja2Templates  # (directory=str(Path(str(Path(__file__).parent), 'templates')))
