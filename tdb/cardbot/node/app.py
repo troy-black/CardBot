@@ -7,7 +7,7 @@ from tdb.cardbot.node import routes
 
 
 class App(BaseApp):
-    router: APIRouter = routes.router
+    router: APIRouter = routes.Routes.router
     config = config.Config
 
 
