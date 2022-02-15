@@ -8,7 +8,7 @@ from tdb.cardbot.core.database import Database
 
 
 class App(BaseApp):
-    router: APIRouter = routes.router
+    router: APIRouter = routes.Routes.router
     config = config.Config
 
     @classmethod

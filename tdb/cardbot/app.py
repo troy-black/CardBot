@@ -7,6 +7,7 @@ from uvicorn import Server
 
 from tdb.cardbot import config
 from tdb.cardbot import logger
+from tdb.cardbot.routes import BaseRoutes
 
 
 class BaseApp(ABC):
@@ -21,6 +22,8 @@ class BaseApp(ABC):
         cls.config.load()
 
         logging.debug(f'Starting Application')
+
+        cls.app.include_router(BaseRoutes.router)
 
         # Load specific api routes for application
         cls.app.include_router(cls.router)
