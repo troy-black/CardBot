@@ -12,8 +12,8 @@ from tdb.cardbot.core.crud.card import Card
 from tdb.cardbot.core.crud.job import Job
 from tdb.cardbot.core.crud.set import Set
 from tdb.cardbot.core.database import Database
-from tdb.cardbot.core.futures import Thread, ThreadPool, JobPool
 from tdb.cardbot.core.schemas import SetFull, JobDetails, NewCard
+from tdb.cardbot.futures import Thread, ThreadPool, JobPool
 
 
 class Api(JobPool):
