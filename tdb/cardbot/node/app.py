@@ -1,3 +1,5 @@
+import threading
+
 from fastapi import APIRouter
 
 from tdb.cardbot.app import BaseApp
@@ -13,7 +15,8 @@ class App(BaseApp):
 
 @App.app.on_event("startup")
 def startup_event():
-    gpio.Gpio.run()
+    thread = threading.Thread(target=gpio.Gpio.setup)
+    thread.start()
 
 
 if __name__ == '__main__':
