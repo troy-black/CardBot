@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Date, Computed, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, DateTime
 from sqlalchemy.dialects.postgresql import JSON
 
 from tdb.cardbot.core import config
@@ -13,74 +13,79 @@ from tdb.cardbot.core.utils import download_file
 class Card(Database.base):
     __tablename__ = 'cards'
 
-    uuid = Column(String(36), primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
+    object_type = Column(String, index=True)
 
-    name = Column(String, nullable=False, index=True)
-    asciiName = Column(String, index=True)
-    faceName = Column(String)
+    name = Column(String, index=True)
+    type_line = Column(String)
 
-    searchName = Column(String, Computed(
-        '''
-            CASE 
-                WHEN "faceName" IS NOT NULL THEN "faceName" 
-                WHEN "asciiName" IS NOT NULL THEN "asciiName" 
-                ELSE name 
-            END
-        '''
-    ))
+    lang = Column(String, index=True)
 
-    setCode = Column(String, ForeignKey('sets.code'), nullable=False, index=True)
-    number = Column(String, nullable=False)
+    oracle_text = Column(String)
 
-    colorIdentity = Column(JSON)
-    colors = Column(JSON)
-    manaCost = Column(String)
+    flavor_text = Column(String)
+
+    printed_name = Column(String)
+    printed_type_line = Column(String)
+    printed_text = Column(String)
+
+    set = Column(String, index=True)
+    set_name = Column(String)
+
     rarity = Column(String)
-    artist = Column(String)
+    collector_number = Column(String)
 
-    imageUrl = Column(String)
-    imageLocal = Column(String)
+    colors = Column(JSON)
+    color_identity = Column(JSON)
+    color_indicator = Column(JSON)
 
-    subtypes = Column(JSON)
-    supertypes = Column(JSON)
-    text = Column(String)
-    type = Column(String)
-    types = Column(JSON)
+    mana_cost = Column(String)
+    cmc = Column(String)
 
-    flavorName = Column(String)
-    flavorText = Column(String)
-    keywords = Column(JSON)
-    loyalty = Column(String)
-    manaValue = Column(Float)
     power = Column(String)
     toughness = Column(String)
+    loyalty = Column(String)
 
-    scryfallId = Column(String)
-
-    availability = Column(JSON)
-    hasAlternativeDeckLimit = Column(Boolean)
-    # edhrecRank = Column(Integer)
-
-    borderColor = Column(String)
-    finishes = Column(JSON)
-    frameEffects = Column(JSON)
-    frameVersion = Column(String)
+    border_color = Column(String, index=True)
+    frame = Column(String)
+    frame_effects = Column(JSON)
     layout = Column(String)
-    securityStamp = Column(String)
+
+    keywords = Column(JSON)
+
+    image_url = Column(String)
+    image_local = Column(String)
+    artist = Column(String)
+
+    scryfall_id = Column(String, index=True)
+    mtgjson_uuid = Column(String, index=True)
+    oracle_id = Column(String)
+    mtgo_id = Column(String)
+    cardmarket_id = Column(String)
+    tcgplayer_id = Column(String)
+
+    legalities = Column(JSON)
+
+    reserved = Column(Boolean)
+    reprint = Column(Boolean)
+
+    variation = Column(Boolean)
+    variation_of = Column(String)
+    flavor_name = Column(String)
+
+    foil = Column(Boolean)
+    nonfoil = Column(Boolean)
+
+    oversized = Column(Boolean)
+
+    promo = Column(Boolean)
+    full_art = Column(Boolean)
+    textless = Column(Boolean)
+
     watermark = Column(String)
+    security_stamp = Column(String)
 
-    hasFoil = Column(Boolean)
-    hasNonFoil = Column(Boolean)
-    isAlternative = Column(Boolean)
-    isFullArt = Column(Boolean)
-    isOnlineOnly = Column(Boolean)
-    isOversized = Column(Boolean)
-    isPromo = Column(Boolean)
-    isRebalanced = Column(Boolean)
-    isReprint = Column(Boolean)
-    isReserved = Column(Boolean)
-
-    # cardSet = relationship('Set')
+    prices = Column(JSON)
 
     phash_32 = Column(String)
 
@@ -101,30 +106,22 @@ class Card(Database.base):
         """
         Download image from Scryfall Api
         """
-        if not self.imageUrl:
+        if not self.image_url:
             return
 
-        filename = str(Path(config.Config.image_path, self.imageLocal))
+        filepath = Path(config.Config.image_path, self.image_local)
+        filename = str(filepath)
 
         new_hash = False
         if not os.path.exists(filename):
-            download_file(url=self.imageUrl, filename=filename)
+            download_file(url=self.image_url, filename=filename)
             new_hash = True
 
         if new_hash or not self.phash_32:
-            phash = Image(Path(config.Config.image_path, self.setCode, f'{self.scryfallId}.png'))
-            self.phash_32 = str(phash.image_hash())
-
-
-class Set(Database.base):
-    __tablename__ = 'sets'
-
-    code = Column(String(8), primary_key=True, index=True)
-    name = Column(String)
-    keyruneCode = Column(String)
-    parentCode = Column(String)
-    releaseDate = Column(Date)
-    totalSetSize = Column(Integer)
+            image = Image(filepath)
+            phash = image.image_hash()
+            if phash:
+                self.phash_32 = str(phash)
 
 
 class Job(Database.base):

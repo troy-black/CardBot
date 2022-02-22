@@ -43,3 +43,13 @@ class MTGJson:
                     card_format.pop(key)
 
         return all_prices
+
+    @classmethod
+    def download_card_identifiers(cls) -> dict:
+        data = cls.download_data(Filenames.ALL_PRINTINGS)
+        return {
+            card_data.get('identifiers', {}).get('scryfallId'): card_data['uuid']
+            for set_data in data.values()
+            for card_data in set_data['cards']
+            if card_data.get('identifiers', {}).get('scryfallId')
+        }

@@ -1,10 +1,10 @@
+import logging
 import threading
 import time
 from enum import Enum
 from typing import Optional, List
 
 from tdb.cardbot.futures import Thread, ThreadPool
-
 
 try:
     import RPi.GPIO as GPIO
@@ -40,11 +40,15 @@ class Motor:
 
 
 class Stepper(Motor):
-    def __init__(self, step_pin: int, direction_pin: int, home_pin: int, limit_pin: Optional[int],
+    current_step: int
+
+    def __init__(self, name: str, step_pin: int, direction_pin: int, home_pin: int, limit_pin: Optional[int],
                  *, home_direction: int,
                  home_type: SwitchType = SwitchType.SWITCH,
                  limit_type: SwitchType = SwitchType.SWITCH,
                  default_count: int = None):
+
+        self.name = name
 
         self.step_pin: int = self.setup_output(step_pin)
         self.direction_pin: int = self.setup_output(direction_pin)
@@ -87,34 +91,38 @@ class Stepper(Motor):
         # Move toward home position
         return self.home_direction
 
-    def step(self, steps: int = None, blocking: bool = False, home: bool = False):
-        lock: bool = self.lock.acquire(blocking)
+    def step(self, steps: int = None, home: bool = False) -> int:
+        if not self.lock.locked():
 
-        if not lock:
-            return False
+            with self.lock:
+                if not steps or home:
+                    steps = self.default_steps
 
-        if not steps or home:
-            steps = self.default_steps
+                logging.debug(f'{self.name} Stepping...')
 
-        GPIO.output(self.direction_pin, self.direction(steps > 0))
+                GPIO.output(self.direction_pin, self.direction(steps > 0))
 
-        count_by = int(steps / abs(steps))
+                count_by = int(steps / abs(steps))
 
-        for current_step in range(0, steps, count_by):
-            if self.check_limit(steps > 0):
-                return current_step
+                for current_step in range(0, steps, count_by):
+                    if self.check_limit(steps > 0):
+                        logging.debug(f'{self.name} Limit Hit @ {self.current_step}')
+                        # self.lock.release()
+                        return current_step
 
-            GPIO.output(self.step_pin, 1)
-            time.sleep(0.0025)
-            GPIO.output(self.step_pin, 0)
-            time.sleep(0.0025)
+                    GPIO.output(self.step_pin, 1)
+                    time.sleep(0.0025)
+                    GPIO.output(self.step_pin, 0)
+                    time.sleep(0.0025)
 
-            self.current_step += count_by
+                    self.current_step += count_by
 
-        if home:
-            self.current_step = 0
+                if home:
+                    self.current_step = 0
 
-        self.lock.release()
+                logging.debug(f'{self.name} Stepping complete @ {self.current_step}')
+
+                # self.lock.release()
 
         return self.current_step
 
@@ -123,18 +131,18 @@ class VacuumPump(Motor):
     def __init__(self, pump_pin: int):
         self.pump_pin: int = self.setup_output(pump_pin)
 
-    def change(self, on: bool):
+    def change(self, on: bool) -> bool:
         GPIO.output(self.pump_pin, int(on))
         return on
 
 
 class Gpio:
-    z_stepper = Stepper(10, 9, 7, 12, home_direction=1)
-    x_stepper = Stepper(11, 5, 8, None, home_direction=0, default_count=460)
+    z_stepper = Stepper('z_stepper', 10, 9, 7, 12, home_direction=1)
+    x_stepper = Stepper('x_stepper', 11, 5, 8, None, home_direction=0, default_count=460)
     x_stepper.lock = z_stepper.lock
 
-    input_stepper = Stepper(19, 26, 18, 23, home_direction=0, limit_type=SwitchType.IR)
-    output_stepper = Stepper(6, 13, 24, 25, home_direction=0, limit_type=SwitchType.IR)
+    input_stepper = Stepper('input_stepper', 19, 26, 18, 23, home_direction=0, limit_type=SwitchType.IR)
+    output_stepper = Stepper('output_stepper', 6, 13, 24, 25, home_direction=0, limit_type=SwitchType.IR)
 
     vacuum_pump = VacuumPump(16)
 
@@ -143,46 +151,60 @@ class Gpio:
         # Reset vacuum
         cls.vacuum_pump.change(False)
 
+        # # Home all steppers
+        # cls.z_stepper.step(home=True)
+        # cls.input_stepper.step(home=True)
+        # cls.output_stepper.step(home=True)
+        #
+        # cls.x_stepper.step(home=True)
+        #
+        # # Move card stacks to ready pos at the top
+        # cls.input_stepper.step(steps=-cls.input_stepper.default_steps)
+        # cls.output_stepper.step(steps=-cls.output_stepper.default_steps)
+
         threads: List[Thread] = [
             # Home all steppers
-            Thread(cls.z_stepper.step, blocking=True, home=True),
-            Thread(cls.x_stepper.step, blocking=True, home=True),
-            Thread(cls.input_stepper.step, blocking=True, home=True),
-            Thread(cls.output_stepper.step, blocking=True, home=True),
+            Thread(cls.z_stepper.step, home=True),
+            Thread(cls.input_stepper.step, home=True),
+            Thread(cls.output_stepper.step, home=True),
+
+            Thread(cls.x_stepper.step, home=True),
 
             # Move card stacks to ready pos at the top
-            Thread(cls.input_stepper.step, blocking=True, steps=-cls.input_stepper.default_steps),
-            Thread(cls.output_stepper.step, blocking=True, steps=-cls.output_stepper.default_steps)
+            Thread(cls.input_stepper.step, steps=-cls.input_stepper.default_steps),
+            Thread(cls.output_stepper.step, steps=-cls.output_stepper.default_steps)
         ]
 
-        return ThreadPool.run(threads, thread_prefix='gpio')
+        results = ThreadPool.run(threads, thread_prefix='gpio')
+
+        return results
+        # return True
 
     @classmethod
     def loop(cls):
-        cls.x_stepper.step(-cls.x_stepper.default_steps, blocking=True)
+        cls.x_stepper.step(-cls.x_stepper.default_steps)
 
-        cls.z_stepper.step(-cls.z_stepper.default_steps, blocking=True)
+        cls.z_stepper.step(-cls.z_stepper.default_steps)
 
         cls.vacuum_pump.change(True)
-        time.sleep(0.5)
+        time.sleep(.5)
 
-        cls.z_stepper.step(blocking=True, home=True)
+        cls.z_stepper.step(home=True)
 
         threads: List[Thread] = [
-            Thread(cls.x_stepper.step, blocking=True, home=True),
-            # Thread(cls.input_stepper.step, steps=-100, blocking=True),
-            Thread(cls.input_stepper.step, blocking=True, steps=-cls.input_stepper.default_steps),
+            Thread(cls.x_stepper.step, home=True),
+            Thread(cls.input_stepper.step, steps=-cls.input_stepper.default_steps),
+            Thread(cls.output_stepper.step, steps=-500),
         ]
         ThreadPool.run(threads, thread_prefix='gpio')
 
-        cls.z_stepper.step(-cls.z_stepper.default_steps, blocking=True)
+        cls.z_stepper.step(-cls.z_stepper.default_steps)
 
         cls.vacuum_pump.change(False)
-        time.sleep(0.5)
+        time.sleep(.5)
 
         threads: List[Thread] = [
-            Thread(cls.z_stepper.step, blocking=True, home=True),
-            Thread(cls.output_stepper.step, steps=-100, blocking=True),
-            Thread(cls.output_stepper.step, blocking=True, steps=-cls.input_stepper.default_steps),
+            Thread(cls.z_stepper.step, home=True),
+            Thread(cls.output_stepper.step, steps=-cls.input_stepper.default_steps),
         ]
         ThreadPool.run(threads, thread_prefix='gpio')

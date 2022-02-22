@@ -1,10 +1,12 @@
 import logging
+import os
 from pathlib import Path
+from typing import Optional
 
 import imagehash
 import numpy
 import scipy.fftpack
-from PIL import ImageFile, Image as PillowImage
+from PIL import ImageFile, Image as PillowImage, UnidentifiedImageError
 
 from tdb.cardbot.core import config
 
@@ -31,7 +33,7 @@ class Image:
         """
         Perform alpha filter on image to convert to pure RGB
         """
-        if self.pillow_image.mode == 'RGBA':
+        if self.pillow_image and self.pillow_image.mode == 'RGBA':
             canvas = PillowImage.new('RGBA', self.pillow_image.size, (255, 255, 255, 255))
             canvas.paste(self.pillow_image, mask=self.pillow_image)
 
@@ -43,17 +45,22 @@ class Image:
         """
         # logging.debug(f'{self.thread_id}Opening Image: {self.filename}')
 
-        image = PillowImage.open(self.path)
-        width, height = image.size
+        try:
+            image = PillowImage.open(self.path)
+            width, height = image.size
 
-        # resize image to have a set base height
-        size_diff = config.Config.hash_pixels_height / height
-        new_width = int(width * size_diff)
-        new_height = int(height * size_diff)
+            # resize image to have a set base height
+            size_diff = config.Config.hash_pixels_height / height
+            new_width = int(width * size_diff)
+            new_height = int(height * size_diff)
 
-        self.pillow_image = image.resize((new_width, new_height))
+            self.pillow_image = image.resize((new_width, new_height))
+        except UnidentifiedImageError:
+            logging.warning(f'Unable to open image: {self.path}')
+            os.remove(self.path)
 
-    def image_hash(self, hash_size: int = 48, high_freq_factor: int = 4, transform: bool = True) -> imagehash.ImageHash:
+    def image_hash(self, hash_size: int = 48, high_freq_factor: int = 4,
+                   transform: bool = True) -> Optional[imagehash.ImageHash]:
         """
         Perform phash on loaded image
 
@@ -63,22 +70,25 @@ class Image:
         :return: imagehash.ImageHash containing phash and tools to compare
         """
         # try:
-        img_size = hash_size * high_freq_factor
-        image = self.pillow_image.convert("L").resize((img_size, img_size), PillowImage.ANTIALIAS)
+        if self.pillow_image:
+            img_size = hash_size * high_freq_factor
+            image = self.pillow_image.convert("L").resize((img_size, img_size), PillowImage.ANTIALIAS)
 
-        if transform:
-            image = self.z_transform(image)
+            if transform:
+                image = self.z_transform(image)
 
-        pixels = numpy.asarray(image)
-        dct = scipy.fftpack.dct(scipy.fftpack.dct(pixels, axis=0), axis=1)
-        dct_low_freq = dct[:hash_size, :hash_size]
-        med = numpy.median(dct_low_freq)
-        diff = dct_low_freq > med
-        image_hash = imagehash.ImageHash(diff)
+            pixels = numpy.asarray(image)
+            dct = scipy.fftpack.dct(scipy.fftpack.dct(pixels, axis=0), axis=1)
+            dct_low_freq = dct[:hash_size, :hash_size]
+            med = numpy.median(dct_low_freq)
+            diff = dct_low_freq > med
+            image_hash = imagehash.ImageHash(diff)
 
-        logging.debug(f'ImageHash: {image_hash}')
+            logging.debug(f'ImageHash: {image_hash}')
 
-        return image_hash
+            return image_hash
+
+        return None
         # except Exception as e:
         #     logging.error(f'Unable to perform phash [{filename}]: {e}', exc_info=True)
         #     return {}

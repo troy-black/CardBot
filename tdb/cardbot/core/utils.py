@@ -4,12 +4,12 @@ import lzma
 import os
 import tempfile
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, Union
 
 import requests
 
 
-def download_file(url: str, *, filename: str = None) -> dict:
+def download_file(url: str, *, filename: str = None) -> Union[dict, list]:
     """
     Download file from url
 
