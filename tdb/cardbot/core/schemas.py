@@ -1,7 +1,5 @@
 import datetime
-from datetime import date
-from enum import Enum
-from typing import Optional, List
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -11,77 +9,80 @@ class BaseSchema(BaseModel):
         return self.__class__.__name__
 
 
-class SetFull(BaseSchema):
-    code: str
-    name: str
-    keyruneCode: Optional[str]
-    releaseDate: Optional[date]
-
-    parentCode: Optional[str]
-    totalSetSize: Optional[int]
-
-    class Config:
-        orm_mode = True
-
-    def print(self):
-        return f'[{self.code}] {self.name}'
-
-
 class NewCard(BaseSchema):
-    uuid: str
-    name: str
-    asciiName: Optional[str]
-    setCode: str
-    number: str
-    colorIdentity: Optional[List[str]]
-    colors: Optional[List[str]]
-    manaCost: Optional[str]
+    id: str
+    object_type: str
+
+    name: Optional[str]
+    type_line: Optional[str]
+
+    lang: Optional[str]
+
+    oracle_text: Optional[str]
+
+    flavor_text: Optional[str]
+
+    printed_name: Optional[str]
+    printed_type_line: Optional[str]
+    printed_text: Optional[str]
+
+    set: Optional[str]
+    set_name: Optional[str]
+
     rarity: Optional[str]
-    artist: Optional[str]
+    collector_number: Optional[str]
 
-    imageUrl: Optional[str]
-    imageLocal: Optional[str]
+    colors: Optional[list]
+    color_identity: Optional[list]
+    color_indicator: Optional[list]
 
-    faceName: Optional[str]
+    mana_cost: Optional[str]
+    cmc: Optional[str]
 
-    subtypes: Optional[List[str]]
-    supertypes: Optional[List[str]]
-    text: Optional[str]
-    type: Optional[str]
-    types: Optional[List[str]]
-
-    flavorName: Optional[str]
-    flavorText: Optional[str]
-    keywords: Optional[List[str]]
-    loyalty: Optional[str]
-    manaValue: Optional[int]
     power: Optional[str]
     toughness: Optional[str]
+    loyalty: Optional[str]
 
-    scryfallId: Optional[str]
-
-    availability: Optional[List[str]]
-    hasAlternativeDeckLimit: Optional[bool]
-    # edhrecRank: Optional[int]
-
-    borderColor: Optional[str]
-    finishes: Optional[List[str]]
-    frameEffects: Optional[List[str]]
-    frameVersion: Optional[str]
+    border_color: Optional[str]
+    frame: Optional[str]
+    frame_effects: Optional[list]
     layout: Optional[str]
-    securityStamp: Optional[str]
-    watermark: Optional[str]
 
-    hasFoil: Optional[bool]
-    hasNonFoil: Optional[bool]
-    isAlternative: Optional[bool]
-    isFullArt: Optional[bool]
-    isOnlineOnly: Optional[bool]
-    isOversized: Optional[bool]
-    isPromo: Optional[bool]
-    isRebalanced: Optional[bool]
-    isReprint: Optional[bool]
-    isReserved: Optional[bool]
+    keywords: Optional[list]
+
+    image_url: Optional[str]
+    image_local: Optional[str]
+    artist: Optional[str]
+
+    scryfall_id: Optional[str]
+    mtgjson_uuid: Optional[str]
+    oracle_id: Optional[str]
+    mtgo_id: Optional[str]
+    cardmarket_id: Optional[str]
+    tcgplayer_id: Optional[str]
+
+    legalities: Optional[dict]
+
+    reserved: Optional[bool]
+    reprint: Optional[bool]
+
+    variation: Optional[bool]
+    variation_of: Optional[str]
+    flavor_name: Optional[str]
+
+    foil: Optional[bool]
+    nonfoil: Optional[bool]
+
+    oversized: Optional[bool]
+
+    promo: Optional[bool]
+    full_art: Optional[bool]
+    textless: Optional[bool]
+
+    watermark: Optional[str]
+    security_stamp: Optional[str]
+
+    prices: Optional[dict]
 
     cardkingdom_buylist_foil: Optional[dict]
     cardkingdom_buylist_normal: Optional[dict]
@@ -96,22 +97,19 @@ class NewCard(BaseSchema):
     tcgplayer_retail_foil: Optional[dict]
     tcgplayer_retail_normal: Optional[dict]
 
-    # cardSet: Optional[SetFull]
-
     class Config:
         orm_mode = True
 
     def print(self):
-        return f'[{self.setCode}] {self.faceName or self.asciiName or self.name} [{self.number}]'
+        return f'[{self.set}] {self.printed_name or self.name} [{self.collector_number}]'
 
 
-class CardMarket(Enum):
-    # TODO - ENUMS
-    pass
+# class CardMarket(Enum):
+#     # TODO - ENUMS
+#     pass
 
 
 class CardFull(NewCard):
-    searchName: Optional[str]
     phash_32: Optional[str]
 
     def price_schema(self):

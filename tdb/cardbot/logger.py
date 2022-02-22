@@ -46,6 +46,8 @@ def setup_logging(level: str, serialize: bool):
     # TODO - Does this need removed from 'node'
     # Change specific loggers to lower log noise
     logging.getLogger('PIL.PngImagePlugin').setLevel(logging.WARNING)
+    logging.getLogger('PIL.Image').setLevel(logging.WARNING)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
 
     # configure loguru
     logger.configure(handlers=[

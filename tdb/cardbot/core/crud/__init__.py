@@ -114,8 +114,7 @@ class CRUD(ABC):
                     db.commit()
                     db.refresh(model)
 
-                if cls.__name__ != 'Log':
-                    logging.debug(f'Updating {schema.print()}: {changes}')
+                logging.debug(f'Updating {schema.print()}: {changes}')
 
         else:
             # Create new record

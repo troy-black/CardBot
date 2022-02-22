@@ -12,14 +12,14 @@ class Card(CRUD):
     Model = TypeVar('Model', bound=models.Card)
 
     model_class: Callable = models.Card
-    model_column: Column = models.Card.uuid
+    model_column: Column = models.Card.id
 
-    uuid: str
+    id: str
     phash_32: str
-    setCode: str
-    scryfallId: str
-    imageUrl: str
-    imageLocal: str
+    set: str
+    scryfall_id: str
+    image_url: str
+    image_local: str
 
     @classmethod
     def read_all_hashes(cls, db: Session) -> List[models.Card]:
