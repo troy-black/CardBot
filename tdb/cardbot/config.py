@@ -8,6 +8,8 @@ class BaseConfig(ABC):
     log_level: str = 'DEBUG'
     serialize_logging: bool = False
 
+    hash_pixels_height: int = 1000
+
     @classmethod
     def load(cls, **kwargs):
         """
@@ -38,6 +40,7 @@ class BaseConfig(ABC):
 
         cls.log_level = details.get('log_level', cls.log_level)
         cls.serialize_logging = details.get('serialize_logging', cls.serialize_logging)
+        cls.hash_pixels_height = details.get('hash_pixels_height', cls.hash_pixels_height)
 
         cls._load(details)
 

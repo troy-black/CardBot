@@ -1,19 +1,18 @@
+import abc
 import logging
-from abc import ABC
+import pathlib
 
-from fastapi import FastAPI, APIRouter
-from uvicorn import Config as UvicornConfig
-from uvicorn import Server
+import fastapi
+import uvicorn
+from starlette import staticfiles
 
-from tdb.cardbot import config
-from tdb.cardbot import logger
-from tdb.cardbot.routes import BaseRoutes
+from tdb.cardbot import config, logger, routes
 
 
-class BaseApp(ABC):
-    app: FastAPI = FastAPI()
+class BaseApp(abc.ABC):
+    app: fastapi.FastAPI = fastapi.FastAPI()
 
-    router: APIRouter
+    router: fastapi.APIRouter
     config: config.BaseConfig
 
     @classmethod
@@ -23,19 +22,24 @@ class BaseApp(ABC):
 
         logging.debug(f'Starting Application')
 
-        cls.app.include_router(BaseRoutes.router)
+        cls.app.include_router(routes.BaseRoutes.router)
 
         # Load specific api routes for application
         cls.app.include_router(cls.router)
 
-        uvicorn_config = UvicornConfig(
+        cls.app.mount('/static',
+                      staticfiles.StaticFiles(
+                          directory=str(pathlib.Path(str(pathlib.Path(__file__).parent), 'static'))),
+                      name='static')
+
+        uvicorn_config = uvicorn.Config(
             cls.app,
             host='0.0.0.0',
             log_level=cls.config.log_level.lower(),
             workers=4
         )
 
-        server = Server(uvicorn_config)
+        server = uvicorn.Server(uvicorn_config)
 
         # override logging settings to all use loguru
         logger.setup_logging(cls.config.log_level, cls.config.serialize_logging)

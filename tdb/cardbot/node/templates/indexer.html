@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+    <meta content="{% block title %}{% endblock %}" name="description">
+    <meta content="" name="author">
+
+    <title>CardBot - {{ self.title() }}</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="../../static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+</head>
+
+<body id="body">
+
+<script>
+
+    function reloadImage() {
+        let camImage = document.getElementById('camImage');
+        camImage.src = `/process/image/last?ts=${new Date().getTime()}`;
+    }
+
+    function startIndexing() {
+        let stackName = document.getElementById('stackName'),
+            language = document.getElementById('language'),
+            foil = document.getElementById('foil'),
+            proxy = document.getElementById('proxy'),
+            damaged = document.getElementById('damaged'),
+            camImage = document.getElementById('camImage'),
+            xmlHttpRequest = new XMLHttpRequest(),
+            results;
+
+        camImage.src = '';
+        camImage.onclick = null;
+
+        xmlHttpRequest.open(
+            'GET',
+            `/start/index/${stackName.value}/${language.value}/${foil.value}/${proxy.value}/${damaged.value}`
+        );
+
+        xmlHttpRequest.onload = function () {
+            if (xmlHttpRequest.status === 202) {
+                results = JSON.parse(xmlHttpRequest.responseText);
+                reloadImage();
+            } else {
+                debugger;
+                alert('startIndexing error');
+            }
+        }
+        xmlHttpRequest.send();
+    }
+
+</script>
+
+<div class="row">
+    <div class="column">
+        <label for="stackName">Stack Name:</label>
+        <input id="stackName" type="text">
+    </div>
+    <div class="column">
+        <label for="language">Language:</label>
+        <select id="language">
+            <option value="en">en</option>
+            <option value="ar">ar</option>
+            <option value="de">de</option>
+            <option value="es">es</option>
+            <option value="fr">fr</option>
+            <option value="grc">grc</option>
+            <option value="he">he</option>
+            <option value="it">it</option>
+            <option value="ja">ja</option>
+            <option value="ko">ko</option>
+            <option value="la">la</option>
+            <option value="ph">ph</option>
+            <option value="pt">pt</option>
+            <option value="ru">ru</option>
+            <option value="sa">sa</option>
+            <option value="zhs">zhs</option>
+            <option value="zht">zht</option>
+        </select>
+    </div>
+    <div class="column">
+        <label for="foil">Foil:</label>
+        <input id="foil" type="checkbox" value="true">
+    </div>
+    <div class="column">
+        <label for="proxy">Proxy:</label>
+        <input id="proxy" type="checkbox" value="true">
+    </div>
+    <div class="column">
+        <label for="damaged">Damaged:</label>
+        <input id="damaged" type="checkbox" value="true">
+    </div>
+</div>
+
+<div class="row">
+    <div class="column">
+        <button onclick="startIndexing()" id="startButton" type="button">Start Indexing</button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="column">
+        <img alt="camImage" id="camImage" src="" onclick="reloadImage()" onload="reloadImage()">
+    </div>
+</div>
+
+</body>
+
+</html>

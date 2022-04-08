@@ -1,28 +1,29 @@
+import enum
 import logging
 import threading
 import time
-from enum import Enum
 from typing import Optional, List
 
-from tdb.cardbot.futures import Thread, ThreadPool
+from tdb.cardbot import futures
 
 try:
     import RPi.GPIO as GPIO
+
     MAX_STEPS = 50_000
 except ImportError:
     import Mock.GPIO as GPIO
-    MAX_STEPS = 500
 
+    MAX_STEPS = 500
 
 GPIO.setmode(GPIO.BCM)
 
 
-class Direction(Enum):
+class Direction(enum.Enum):
     POSITIVE = 1
     NEGATIVE = 0
 
 
-class SwitchType(Enum):
+class SwitchType(enum.Enum):
     IR = 0
     SWITCH = 1
 
@@ -76,12 +77,17 @@ class Stepper(Motor):
         self.lock = threading.Lock()
 
     def check_limit(self, positive: bool):
+        limit_pin_value = GPIO.input(self.limit_pin) if self.limit_pin else 0
+        home_pin_value = GPIO.input(self.home_pin)
+
+        # logging.debug(f'{self.name} Limit Pin Values - Home: {home_pin_value} - Limit: {limit_pin_value}')
+
         if positive:
             # Move away from home position
-            return self.limit_pin and GPIO.input(self.limit_pin) == self.limit_type.value
+            return self.limit_pin and limit_pin_value == self.limit_type.value
 
         # Move toward home position
-        return GPIO.input(self.home_pin) == self.home_type.value
+        return home_pin_value == self.home_type.value
 
     def direction(self, positive: bool):
         if positive:
@@ -106,14 +112,13 @@ class Stepper(Motor):
 
                 for current_step in range(0, steps, count_by):
                     if self.check_limit(steps > 0):
-                        logging.debug(f'{self.name} Limit Hit @ {self.current_step}')
                         # self.lock.release()
                         return current_step
 
                     GPIO.output(self.step_pin, 1)
-                    time.sleep(0.0025)
+                    time.sleep(0.001)
                     GPIO.output(self.step_pin, 0)
-                    time.sleep(0.0025)
+                    time.sleep(0.001)
 
                     self.current_step += count_by
 
@@ -121,8 +126,6 @@ class Stepper(Motor):
                     self.current_step = 0
 
                 logging.debug(f'{self.name} Stepping complete @ {self.current_step}')
-
-                # self.lock.release()
 
         return self.current_step
 
@@ -137,74 +140,103 @@ class VacuumPump(Motor):
 
 
 class Gpio:
-    z_stepper = Stepper('z_stepper', 10, 9, 7, 12, home_direction=1)
+    z_stepper = Stepper('z_stepper', 10, 9, 7, 12, home_direction=1, default_count=600)
     x_stepper = Stepper('x_stepper', 11, 5, 8, None, home_direction=0, default_count=460)
     x_stepper.lock = z_stepper.lock
 
-    input_stepper = Stepper('input_stepper', 19, 26, 18, 23, home_direction=0, limit_type=SwitchType.IR)
-    output_stepper = Stepper('output_stepper', 6, 13, 24, 25, home_direction=0, limit_type=SwitchType.IR)
+    input_stepper = Stepper('input_stepper', 19, 26, 18, 25, home_direction=0, limit_type=SwitchType.IR)
+    output_stepper = Stepper('output_stepper', 6, 13, 24, 23, home_direction=0, limit_type=SwitchType.IR)
 
     vacuum_pump = VacuumPump(16)
 
     @classmethod
-    def setup(cls):
+    def setup(cls, home_stacks: bool = True, blocking: bool = False):
+        if not blocking:
+            logging.debug('Starting new setup thread')
+            thread = threading.Thread(target=cls.setup, args=(home_stacks, True))
+            thread.start()
+            return
+
+        logging.debug('Running setup')
+
+        if not cls.input_stepper.check_limit(True):
+            print()
+
+        if not cls.output_stepper.check_limit(True):
+            print()
+
+        # Home steppers
+        cls.z_stepper.step(home=True)
+        cls.x_stepper.step(home=True)
+
         # Reset vacuum
         cls.vacuum_pump.change(False)
 
-        # # Home all steppers
-        # cls.z_stepper.step(home=True)
-        # cls.input_stepper.step(home=True)
-        # cls.output_stepper.step(home=True)
-        #
-        # cls.x_stepper.step(home=True)
-        #
-        # # Move card stacks to ready pos at the top
-        # cls.input_stepper.step(steps=-cls.input_stepper.default_steps)
-        # cls.output_stepper.step(steps=-cls.output_stepper.default_steps)
+        if home_stacks:
+            threads: List[futures.Thread] = [
+                futures.Thread(cls.input_stepper.step, steps=-800),
+                futures.Thread(cls.output_stepper.step, steps=-800),
+            ]
+            futures.ThreadPool.run(threads, thread_prefix='gpio')
 
-        threads: List[Thread] = [
-            # Home all steppers
-            Thread(cls.z_stepper.step, home=True),
-            Thread(cls.input_stepper.step, home=True),
-            Thread(cls.output_stepper.step, home=True),
-
-            Thread(cls.x_stepper.step, home=True),
-
-            # Move card stacks to ready pos at the top
-            Thread(cls.input_stepper.step, steps=-cls.input_stepper.default_steps),
-            Thread(cls.output_stepper.step, steps=-cls.output_stepper.default_steps)
+        # Move card stacks to ready pos at the top
+        threads: List[futures.Thread] = [
+            futures.Thread(cls.input_stepper.step, steps=-cls.input_stepper.default_steps),
+            futures.Thread(cls.output_stepper.step, steps=-cls.output_stepper.default_steps)
         ]
-
-        results = ThreadPool.run(threads, thread_prefix='gpio')
+        results = futures.ThreadPool.run(threads, thread_prefix='gpio')
 
         return results
-        # return True
 
     @classmethod
-    def loop(cls):
+    def loop(cls, home: bool = True, blocking: bool = False):
+        if not blocking:
+            logging.debug('Starting new loop thread')
+            thread = threading.Thread(target=cls.loop, args=(home, not blocking))
+            thread.start()
+            return
+
+        cls.begin_loop(home=home)
+
+    @classmethod
+    def begin_loop(cls, home: bool = True):
+        logging.debug('Running loop')
+
+        if home:
+            cls.setup(home_stacks=False, blocking=True)
+
         cls.x_stepper.step(-cls.x_stepper.default_steps)
 
         cls.z_stepper.step(-cls.z_stepper.default_steps)
 
         cls.vacuum_pump.change(True)
-        time.sleep(.5)
+
+        time.sleep(.1)
 
         cls.z_stepper.step(home=True)
 
-        threads: List[Thread] = [
-            Thread(cls.x_stepper.step, home=True),
-            Thread(cls.input_stepper.step, steps=-cls.input_stepper.default_steps),
-            Thread(cls.output_stepper.step, steps=-500),
+        cls.z_stepper.step(100)
+
+        cls.z_stepper.step(home=True)
+
+        time.sleep(.5)
+
+        threads: List[futures.Thread] = [
+            futures.Thread(cls.x_stepper.step, home=True),
+            futures.Thread(cls.input_stepper.step, steps=-20),
         ]
-        ThreadPool.run(threads, thread_prefix='gpio')
+        futures.ThreadPool.run(threads, thread_prefix='gpio')
+
+        cls.vacuum_pump.change(False)
 
         cls.z_stepper.step(-cls.z_stepper.default_steps)
 
-        cls.vacuum_pump.change(False)
-        time.sleep(.5)
+        cls.output_stepper.step(-20)
 
-        threads: List[Thread] = [
-            Thread(cls.z_stepper.step, home=True),
-            Thread(cls.output_stepper.step, steps=-cls.input_stepper.default_steps),
+        # Move card stacks to ready pos at the top
+        threads: List[futures.Thread] = [
+            futures.Thread(cls.z_stepper.step, home=True),
+            futures.Thread(cls.input_stepper.step, steps=-cls.input_stepper.default_steps),
+            futures.Thread(cls.output_stepper.step, steps=-cls.output_stepper.default_steps)
         ]
-        ThreadPool.run(threads, thread_prefix='gpio')
+        futures.ThreadPool.run(threads, thread_prefix='gpio')

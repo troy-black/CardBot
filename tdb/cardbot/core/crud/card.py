@@ -1,34 +1,43 @@
 from typing import TypeVar, Callable, List
 
 from sqlalchemy import Column
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
+from tdb.cardbot import crud
 from tdb.cardbot.core import schemas, models
-from tdb.cardbot.core.crud import CRUD
 
 
-class Card(CRUD):
-    Schema = TypeVar('Schema', bound=schemas.CardFull)
+class Card(crud.CRUD):
+    Schema = TypeVar('Schema', bound=schemas.Card)
     Model = TypeVar('Model', bound=models.Card)
 
     model_class: Callable = models.Card
     model_column: Column = models.Card.id
 
     id: str
-    phash_32: str
-    set: str
-    scryfall_id: str
-    image_url: str
-    image_local: str
 
     @classmethod
-    def read_all_hashes(cls, db: Session) -> List[models.Card]:
-        """
-        Pull all records with a phash
+    def new_read_all_hashes(cls, db: Session, offset: int = 0, limit: int = 100) -> List[Row]:
+        return db.query(
+            models.Card.id,
+            models.Card.phash_32,
+        ).filter(
+            models.Card.phash_32.is_not(None)
+        ).offset(offset).limit(limit).all()
 
-        :param db: SqlAlchemy DB Session
-        :return: List[Card]
-        """
-        return db.query(models.Card).filter(
-            models.Card.phash_32 is not None
-        ).all()
+
+class CardMeta(crud.CRUD):
+    Schema = TypeVar('Schema', bound=schemas.CardMeta)
+    Model = TypeVar('Model', bound=models.CardMeta)
+
+    model_class: Callable = models.CardMeta
+    model_column: Column = models.CardMeta.id
+
+
+class CardHistoricPricing(crud.CRUD):
+    Schema = TypeVar('Schema', bound=schemas.CardHistoricPricing)
+    Model = TypeVar('Model', bound=models.CardHistoricPricing)
+
+    model_class: Callable = models.CardHistoricPricing
+    model_column: Column = models.CardHistoricPricing.id

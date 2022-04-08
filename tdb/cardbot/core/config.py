@@ -1,14 +1,15 @@
 import os
 from pathlib import Path
 
-from tdb.cardbot.config import BaseConfig
+from tdb.cardbot import config
 
 
-class Config(BaseConfig):
+class CoreConfig(config.BaseConfig):
     app: str = 'tdb.cardbot.core.app:App'
-    hash_pixels_height: int = 1000
     image_path: str = '/images/'
     max_threads: int = 1
+
+    phash_size: int = 32
 
     @classmethod
     def _load(cls, details: dict):
@@ -25,5 +26,4 @@ class Config(BaseConfig):
         os.makedirs(cls.image_path, exist_ok=True)
 
         # Load remaining Core Config details
-        cls.hash_pixels_height = details.get('hash_pixels_height', cls.hash_pixels_height)
         cls.max_threads = details.get('max_threads', os.cpu_count() or cls.max_threads)

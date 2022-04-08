@@ -12,8 +12,13 @@ numpy
 imagehash
 scipy
 
+opencv-python
+
 pip
 wheel
 setuptools
 
 Mock.GPIO
+
+Shapely
+scikit-learn

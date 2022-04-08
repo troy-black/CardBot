@@ -1,24 +1,24 @@
 from fastapi import APIRouter
 
-from tdb.cardbot.app import BaseApp
-from tdb.cardbot.core import config
-from tdb.cardbot.core import routes
-from tdb.cardbot.core.crud.job import Job
-from tdb.cardbot.core.database import Database
+from tdb.cardbot import app
+from tdb.cardbot.core import config, database, hashing, routes
+from tdb.cardbot.crud.job import Job
 
 
-class App(BaseApp):
+class App(app.BaseApp):
     router: APIRouter = routes.Routes.router
-    config = config.Config
+    config = config.CoreConfig
 
     @classmethod
     def _setup(cls):
         # Bind DB Model Object to each DB Table
-        Database.base.metadata.create_all(bind=Database.engine())
+        database.Database.base.metadata.create_all(bind=database.Database.engine())
 
         # Clear temp table(s)
-        with Database.db_contextmanager() as db:
+        with database.Database.db_contextmanager() as db:
             Job.truncate(db)
+
+        hashing.HashTable.load()
 
 
 if __name__ == '__main__':

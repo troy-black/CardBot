@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+    <meta content="{% block title %}{% endblock %}" name="description">
+    <meta content="" name="author">
+
+    <title>CardBot - {{ self.title() }}</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="../../static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+</head>
+
+<body id="body">
+
+<script>
+    function loadCardFromStack(increment) {
+        let stackName = document.getElementById('stackName'),
+            card_ids = document.getElementById('card_ids'),
+            indexNumber = document.getElementById('indexNumber'),
+            processedImage = document.getElementById('processedImage'),
+            matchedImage = document.getElementById('matchedImage'),
+            xmlHttpRequest = new XMLHttpRequest(),
+            option, results, r, index;
+
+        if (indexNumber.selectedIndex + increment >= indexNumber.length) {
+            loadStack(stackName[stackName.selectedIndex].value, increment);
+        } else {
+            index = indexNumber[indexNumber.selectedIndex + increment].value;
+
+            xmlHttpRequest.open('GET', `/scan/${stackName.value}/${(index)}/`);
+
+            xmlHttpRequest.onload = function () {
+                if (xmlHttpRequest.status === 200) {
+                    results = JSON.parse(xmlHttpRequest.responseText);
+
+                    indexNumber.selectedIndex += increment;
+
+                    processedImage.src = `/scan/${stackName.value}/${index}/processed`;
+                    matchedImage.src = `/card/${results['card_id']}/image`;
+
+                    while (card_ids.options.length) {
+                        card_ids.remove(0);
+                    }
+
+                    for (r = 0; r < results['closest_matches'].length; r++) {
+                        option = document.createElement('option');
+                        option.value = option.text = results['closest_matches'][r];
+                        card_ids.add(option);
+                    }
+
+                    card_ids.value = results['card_id'];
+                    loadCardDetails(stackName.value, index);
+                } else {
+                    debugger;
+                }
+            }
+            xmlHttpRequest.send();
+        }
+    }
+
+    function loadCardDetails(stackName, index) {
+        let language = document.getElementById('language'),
+            foil = document.getElementById('foil'),
+            proxy = document.getElementById('proxy'),
+            damaged = document.getElementById('damaged'),
+            xmlHttpRequest = new XMLHttpRequest(),
+            results;
+
+        xmlHttpRequest.open('GET', `/details/${stackName}/${(index)}/`);
+
+        xmlHttpRequest.onload = function () {
+            if (xmlHttpRequest.status === 200) {
+                debugger;
+                results = JSON.parse(xmlHttpRequest.responseText);
+
+                language.value = results['language'];
+
+                foil.checked = results['foil'];
+                proxy.checked = results['proxy'];
+                damaged.checked = results['damaged'];
+            } else {
+                debugger;
+            }
+        }
+        xmlHttpRequest.send();
+    }
+
+    function loadMatchedImage(card_id) {
+        let matchedImage = document.getElementById('matchedImage');
+        matchedImage.src = `/card/${card_id}/image`;
+
+        updateMatched(card_id);
+    }
+
+    function keypress(event) {
+        let key = event.key;
+
+        if (key === 'ArrowUp') {
+            changeMatched(1);
+        } else if (key === 'ArrowDown') {
+            changeMatched(-1);
+        } else if (key === 'ArrowLeft') {
+            loadCardFromStack(-1);
+        } else if (key === 'ArrowRight') {
+            loadCardFromStack(1);
+        }
+    }
+
+    function changeMatched(increment) {
+        let card_ids = document.getElementById('card_ids'),
+            index = card_ids.selectedIndex + increment;
+
+        if (index >= 0 && index < card_ids.length) {
+            card_ids.selectedIndex = index;
+            loadMatchedImage(card_ids.value);
+        }
+    }
+
+    function override() {
+        let override_card_id = document.getElementById('override_card_id');
+        updateMatched(override_card_id.value);
+    }
+
+    function updateMatched(card_id) {
+        let stackName = document.getElementById('stackName'),
+            indexNumber = document.getElementById('indexNumber'),
+            xmlHttpRequest = new XMLHttpRequest(),
+            index;
+
+        index = indexNumber[indexNumber.selectedIndex].value;
+
+        xmlHttpRequest.open('PUT', `/scan/${stackName.value}/${index}/${card_id}`);
+
+        xmlHttpRequest.onload = function () {
+            if (xmlHttpRequest.status === 200) {
+                let results = JSON.parse(xmlHttpRequest.responseText);
+                // debugger;
+            } else {
+                alert('update_card error');
+            }
+        }
+        xmlHttpRequest.send();
+    }
+
+    function loadStack(stack, increment = 0) {
+        let indexNumber = document.getElementById('indexNumber'),
+            xmlHttpRequest = new XMLHttpRequest(),
+            option, results, r, existingList;
+
+        xmlHttpRequest.open('GET', `/scan/${stack}/indexes`);
+
+        xmlHttpRequest.onload = function () {
+            if (xmlHttpRequest.status === 200) {
+                debugger;
+                existingList = [];
+                for (r = 0; r < indexNumber.length; r++) {
+                    option = indexNumber.options[r];
+                    existingList.push(option.value);
+                }
+
+                results = JSON.parse(xmlHttpRequest.responseText);
+
+                if (!arrayEquals(results, existingList)) {
+                    while (indexNumber.options.length) {
+                        indexNumber.remove(0);
+                    }
+
+                    for (r = 0; r < results.length; r++) {
+                        option = document.createElement('option');
+                        option.value = option.text = results[r];
+                        indexNumber.add(option);
+                    }
+
+                    if (!increment) {
+                        indexNumber.selectedIndex = 0;
+                    }
+                    loadCardFromStack(increment);
+                }
+            } else {
+                debugger;
+            }
+        }
+        xmlHttpRequest.send();
+
+    }
+
+    function arrayEquals(array1, array2) {
+        if (array1.length === array2.length) {
+            return array1.every((element, index) => {
+                return element === array2[index];
+            });
+        }
+
+        return false;
+    }
+
+    document.addEventListener('keydown', keypress);
+    document.addEventListener('DOMContentLoaded', function() {
+        let stackName = document.getElementById('stackName');
+        loadStack(stackName[stackName.selectedIndex].value);
+    });
+
+</script>
+
+<div class="row">
+    <div class="column">
+        <label for="stackName">Stack Name:</label>
+        <select id="stackName" onchange="loadStack(this.value)">
+            {% for stackName in stackNames %}
+                <option value="{{ stackName }}">{{ stackName }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div class="row">
+    <div class="column">
+        <label for="indexNumber">Index:</label>
+        <select id="indexNumber" onchange="loadCardFromStack(0)">
+            <option value="1">1</option>
+        </select>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col">
+        <label for="card_ids">CardId:</label>
+        <select id="card_ids" onchange="loadMatchedImage(this.value)">
+        </select>
+    </div>
+</div>
+
+<div class="row">
+    <div class="column">
+        <img alt="processedImage" id="processedImage" src="">
+        <img alt="matchedImage" id="matchedImage" src="">
+    </div>
+</div>
+
+<div class="row">
+    <div class="column">
+        <label for="language">Language:</label>
+        <select id="language">
+            <option value="en">en</option>
+            <option value="ar">ar</option>
+            <option value="de">de</option>
+            <option value="es">es</option>
+            <option value="fr">fr</option>
+            <option value="grc">grc</option>
+            <option value="he">he</option>
+            <option value="it">it</option>
+            <option value="ja">ja</option>
+            <option value="ko">ko</option>
+            <option value="la">la</option>
+            <option value="ph">ph</option>
+            <option value="pt">pt</option>
+            <option value="ru">ru</option>
+            <option value="sa">sa</option>
+            <option value="zhs">zhs</option>
+            <option value="zht">zht</option>
+        </select>
+    </div>
+    <div class="column">
+        <label for="foil">Foil:</label>
+        <input id="foil" type="checkbox" value="true">
+    </div>
+    <div class="column">
+        <label for="proxy">Proxy:</label>
+        <input id="proxy" type="checkbox" value="true">
+    </div>
+    <div class="column">
+        <label for="damaged">Damaged:</label>
+        <input id="damaged" type="checkbox" value="true">
+    </div>
+</div>
+
+<div class="row">
+    <div class="column">
+        <label for="override_card_id">Override CardId:</label>
+        <input id="override_card_id" type="text">
+    </div>
+    <div class="column">
+        <button id="update_card" onclick="override()" type="button">Update</button>
+    </div>
+</div>
+
+</body>
+
+</html>

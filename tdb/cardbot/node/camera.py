@@ -1,23 +1,27 @@
 import io
 import logging
+import threading
 import time
-
 
 import picamera
 
 
 class PiCameraDriver:
     camera: picamera.PiCamera
-    stream: io.BytesIO
 
     last_image_bytes: bytes
+
+    threading_event: threading.Event
 
     @classmethod
     def activate(cls):
         logging.debug(f'Initializing PiCamera')
 
         cls.camera = picamera.PiCamera(sensor_mode=1)
-        cls.camera.resolution = (4056, 3040)
+        cls.camera.rotation = -90
+
+        cls.camera.resolution = (1080, 1920)
+
         cls.camera.framerate_range = (0.005, 30)
 
         cls.camera.exposure_mode = 'auto'
@@ -26,7 +30,8 @@ class PiCameraDriver:
         cls.camera.brightness = 50
         cls.camera.shutter_speed = 0
 
-        cls.stream = io.BytesIO()
+        cls.threading_event = threading.Event()
+        cls.threading_event.clear()
 
         logging.debug(f'Initialized PiCamera: wait 2')
         time.sleep(2)
@@ -37,17 +42,23 @@ class PiCameraDriver:
             cls.camera.close()
 
     @classmethod
-    def capture(cls):
+    def capture(cls, filename: str = None) -> bytes:
         logging.debug(f'Capturing Image')
-        cls.camera.capture(cls.stream, 'jpeg', use_video_port=False)
+        cls.threading_event.set()
 
-        # return current frame
-        cls.stream.seek(0)
-        cls.last_image_bytes = cls.stream.read()
+        stream = io.BytesIO()
+
+        cls.camera.capture(stream, 'jpeg', use_video_port=False)
 
         # reset stream for next frame
-        cls.stream.seek(0)
-        cls.stream.truncate()
-        logging.debug(f'Captured Image')
+        stream.seek(0)
+        cls.last_image_bytes: bytes = stream.read()
+
+        if filename:
+            with open(filename, 'wb') as out_file:
+                out_file.write(cls.last_image_bytes)
+
+        cls.threading_event.clear()
+        logging.debug(f'Processed Image')
 
         return cls.last_image_bytes

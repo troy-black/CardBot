@@ -3,22 +3,48 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Union, Optional
 
 from sqlalchemy.orm import Session
 
+from tdb.cardbot import futures
+from tdb.cardbot import schemas as base_schemas
 from tdb.cardbot.core import config
-from tdb.cardbot.core.api.mtgjson import MTGJson, Filenames
-from tdb.cardbot.core.api.scryfall import Scryfall
-from tdb.cardbot.core.crud.card import Card
-from tdb.cardbot.core.crud.job import Job
-from tdb.cardbot.core.database import Database
-from tdb.cardbot.core.futures import JobPool
-from tdb.cardbot.core.schemas import JobDetails, NewCard
-from tdb.cardbot.futures import Thread, ThreadPool
+from tdb.cardbot.core import database
+from tdb.cardbot.core import hashing, models
+from tdb.cardbot.core import schemas
+from tdb.cardbot.core import utils
+from tdb.cardbot.core.api import mtgjson
+from tdb.cardbot.core.api import scryfall
+from tdb.cardbot.core.crud import card
+from tdb.cardbot.crud import job
 
 
-class Api(JobPool):
+class Api(futures.JobPool):
+    _database = database.Database
+
+    @classmethod
+    def download_image(cls, image_url: str, image_local: str):
+        """
+        Download image from Scryfall Api
+        """
+        filepath = Path(config.CoreConfig.image_path, image_local)
+        filename = str(filepath)
+
+        if not os.path.exists(filename):
+            utils.download_file(url=image_url, filename=filename)
+            return True
+
+        return False
+
+    @classmethod
+    def _hash_image(cls, image_local: str, hash_size=32) -> hashing.HashImage:
+
+        filepath = Path(config.CoreConfig.image_path, image_local)
+        hash_image = hashing.HashImage(filepath, hash_size=hash_size)
+
+        return hash_image
+
     @classmethod
     def _filename(cls, name: str, scryfall_id: str):
         name = name.replace(os.path.sep, '|')
@@ -40,38 +66,48 @@ class Api(JobPool):
                     name
                 ))
 
-        # TODO - Remove this....
-        old_image_local = str(Path(
-            card_data['lang'],
-            card_data['set'],
-            f"{card_data['scryfall_id']}-{card_data['name']}.png"
-        ))
-        old_filename = str(Path(config.Config.image_path, old_image_local))
-
-        if png_url and image_local and image_local != old_image_local:
-            new_filename = str(Path(config.Config.image_path, image_local))
-            if os.path.exists(old_filename) and not os.path.exists(new_filename):
-                os.replace(old_filename, new_filename)
-
-        if os.path.exists(old_filename):
-            os.remove(old_filename)
-        # TODO - ................................................
-
-        card_full = NewCard(
+        new_card = schemas.Card(
             **card_data,
             object_type=card_data['object'],
             image_url=png_url,
             image_local=image_local
         )
+        card_record: models.Card = card.Card.upsert(db, new_card, commit=False)
 
-        card = Card.upsert(db, card_full, commit=False)
+        card_data['prices'] = cls._cleanup_json(card_data.get('prices'))
+
+        new_meta = schemas.CardMeta(**card_data)
+        if new_meta.dict(exclude_unset=True, exclude_defaults=True, exclude={'id'}):
+            card.CardMeta.upsert(db, new_meta, commit=False)
 
         if png_url:
-            card.download_image()
-        # TODO - Remove this.....
-        else:
-            if card.phash_32:
-                card.phash_32 = None
+            updated = cls.download_image(png_url, image_local)
+
+            if not card_record.phash_32:
+                try:
+                    hash_image = cls._hash_image(image_local, 32)
+                    card_record.phash_32 = str(hash_image.image_hash)
+                    updated = True
+                except Exception as e:
+                    print(e)
+
+            # if not card_record.phash_48:
+            #     try:
+            #         hash_image = cls._hash_image(image_local, 48)
+            #         card_record.phash_48 = str(hash_image.image_hash)
+            #         updated = True
+            #     except Exception as e:
+            #         print(e)
+            #
+            # if not card_record.phash_64:
+            #     try:
+            #         hash_image = cls._hash_image(image_local, 64)
+            #         card_record.phash_64 = str(hash_image.image_hash)
+            #         updated = True
+            #     except Exception as e:
+            #         print(e)
+
+        db.commit()
 
     @classmethod
     def _get_card_data(cls, scryfall_data: List[dict]):
@@ -79,6 +115,22 @@ class Api(JobPool):
             return scryfall_data.pop()
         except IndexError:
             return None
+
+    @classmethod
+    def _cleanup_json(cls, json: Optional[Union[dict, list]]) -> Optional[Union[dict, list]]:
+        if not json or str(json).lower() == 'null':
+            return None
+
+        if isinstance(json, dict):
+            for key in [key
+                        for key, val in json.items()
+                        if not val or str(val).lower() == 'null']:
+                json[key] = None
+
+            if all(not v for v in json.values()):
+                return None
+
+        return json
 
     @classmethod
     def _update_database_thread(cls, mtgjson_data: dict, scryfall_data: List[dict], prices: dict, job_id: str) -> dict:
@@ -93,7 +145,7 @@ class Api(JobPool):
         processed = 0
 
         # use a separate db connection for each thread
-        with Database.db_contextmanager() as db:
+        with database.Database.db_contextmanager() as db:
             while scryfall_data:
                 card_data = cls._get_card_data(scryfall_data)
 
@@ -105,42 +157,51 @@ class Api(JobPool):
                 card_set = card_data['set']
 
                 card_faces = []
-                for card_face in card_data.get('card_faces', []):
+                for card_face in card_data.get('card_faces', {}):
                     # Found duplicate card face names in scryfall card_faces
                     name = card_face['name']
                     if name not in card_faces:
                         card_faces.append(name)
+                        if 'image_status' not in card_face:
+                            card_face['image_status'] = card_data.get('image_status')
                         cls._process_card(
                             db,
                             id=f'{scryfall_id}-{name}',
                             scryfall_id=scryfall_id,
                             lang=lang,
                             set=card_set,
-                            **card_face
+                            **cls._cleanup_json(card_face)
                         )
 
                 mtgjson_uuid = mtgjson_data.get(scryfall_id)
-
-                card_price_groups = {
-                    f'{store}_{list_type}_{card_type}': card_prices
-                    for store, store_vals in prices.get(mtgjson_uuid, {}).items()
-                    for list_type, card_types in (store_vals or {}).items()
-                    if isinstance(card_types, dict)
-                    for card_type, card_prices in (card_types or {}).items()
-                }
 
                 cls._process_card(
                     db,
                     scryfall_id=scryfall_id,
                     mtgjson_uuid=mtgjson_uuid,
-                    **card_data,
-                    **card_price_groups
+                    **cls._cleanup_json(card_data)
                 )
+
+                card_price_groups = cls._cleanup_json({
+                    f'{store}_{list_type}_{card_type}': card_prices
+                    for store, store_vals in prices.get(mtgjson_uuid, {}).get('paper', {}).items()
+                    for list_type, card_types in (store_vals or {}).items()
+                    if isinstance(card_types, dict)
+                    for card_type, card_prices in (card_types or {}).items()
+                })
+
+                if card_price_groups:
+                    new_historic = schemas.CardHistoricPricing(
+                        id=card_data['id'],
+                        **card_price_groups
+                    )
+                    card.CardHistoricPricing.upsert(db, new_historic, commit=True)
 
                 if processed % 200:
                     db.commit()
 
-                    if not Job.read_one(db, job_id).status == 'running':
+                    if not job.Job.read_one(db, job_id).status == 'running':
+                        print()
                         break
 
                 logging.debug(f'Api Db Update - Remaining {len(scryfall_data)}')
@@ -150,7 +211,7 @@ class Api(JobPool):
         return {'processed': processed}
 
     @classmethod
-    def _run(cls, details: JobDetails):
+    def _run(cls, details: base_schemas.JobDetails):
         """
         Download and process data from external API sources (MTGJson, Scryfall)
 
@@ -161,12 +222,12 @@ class Api(JobPool):
         cls.last_job_id = details.job_id
 
         # Download data from Scryfall and MTGJson APIs (threaded)
-        threads: List[Thread] = [
-            Thread(Scryfall.download_data, results_id='scryfall'),
-            Thread(MTGJson.download_card_identifiers, results_id='mtgjson'),
-            Thread(MTGJson.download_prices, results_id='prices')
+        threads: List[futures.Thread] = [
+            futures.Thread(scryfall.Scryfall.download_data, results_id='scryfall'),
+            futures.Thread(mtgjson.MTGJson.download_card_identifiers, results_id='mtgjson'),
+            futures.Thread(mtgjson.MTGJson.download_prices, results_id='prices')
         ]
-        results = ThreadPool.run(threads, thread_prefix='ApiSink')
+        results = futures.ThreadPool.run(threads, thread_prefix='ApiSink')
 
         # Separate results
         scryfall_data = results.pop('scryfall')
@@ -174,21 +235,21 @@ class Api(JobPool):
         prices = results.pop('prices')
 
         # Start a new ThreadPool to process the download data from external api
-        threads: List[Thread] = [
-            Thread(
+        threads: List[futures.Thread] = [
+            futures.Thread(
                 cls._update_database_thread,
                 mtgjson_data=mtgjson_data,
                 scryfall_data=scryfall_data,
                 prices=prices,
                 job_id=details.job_id
             )
-            for _ in range(config.Config.max_threads)
+            for _ in range(config.CoreConfig.max_threads)
         ]
-        results = ThreadPool.run(threads, thread_prefix='GetCard')
+        results = futures.ThreadPool.run(threads, thread_prefix='GetCard')
 
-        with Database.db_contextmanager() as db:
+        with database.Database.db_contextmanager() as db:
             # Refresh details
-            details = Job.read_one(db, details.job_id)
+            details = job.Job.read_one(db, details.job_id)
 
             details.results = results
 

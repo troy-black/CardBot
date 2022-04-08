@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from loguru import logger
+import loguru
 
 
 class InterceptHandler(logging.Handler):
@@ -13,7 +13,7 @@ class InterceptHandler(logging.Handler):
         """
         # Get corresponding loguru level if it exists
         try:
-            level = logger.level(record.levelname).name
+            level = loguru.logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
 
@@ -23,7 +23,7 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+        loguru.logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def setup_logging(level: str, serialize: bool):
@@ -50,7 +50,7 @@ def setup_logging(level: str, serialize: bool):
     logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
 
     # configure loguru
-    logger.configure(handlers=[
+    loguru.logger.configure(handlers=[
         {
             'sink': sys.stdout,
             'serialize': serialize,

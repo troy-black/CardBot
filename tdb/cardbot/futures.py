@@ -1,5 +1,48 @@
+import abc
 import concurrent.futures
+import threading
 from typing import Callable, List
+
+from tdb.cardbot import database
+from tdb.cardbot import models
+from tdb.cardbot import schemas
+from tdb.cardbot.crud import job
+
+
+class JobPool(abc.ABC):
+    _lock = threading.Lock()
+    _database: database.BaseDatabase
+
+    last_job_id: int = 0
+
+    @classmethod
+    @abc.abstractmethod
+    def _run(cls, **kwargs):
+        pass
+
+    @classmethod
+    async def run(cls, **kwargs) -> models.Job:
+        """
+        Run Job in background process
+
+        :param kwargs: Dict passed to the function as kwargs
+        :return: JobDetails
+        """
+        with cls._database.db_contextmanager() as db:
+            if cls._lock.acquire(False):
+                details = schemas.JobDetails(job_type=cls.__name__)
+                record = job.Job.create(db, details)
+
+                details = schemas.JobDetails(**record.__dict__)
+
+                # TODO - Should this be multiprocessing instead of threading
+                #        Must run in background and continue
+                thread = threading.Thread(target=cls._run, args=(details,), kwargs=kwargs)
+                thread.start()
+            else:
+                details = job.Job.read_one(db, cls.last_job_id)
+
+        return details
 
 
 class Thread:
